@@ -1,0 +1,81 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { supabase } from '@/lib/supabase'
+import { hashPassword, validatePasswordStrength } from '@/lib/auth'
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { full_name, email, password } = body
+
+    // Validate input
+    if (!full_name || !email || !password) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      )
+    }
+
+    // Validate password strength
+    const passwordValidation = validatePasswordStrength(password)
+    if (!passwordValidation.isValid) {
+      return NextResponse.json(
+        { error: passwordValidation.message },
+        { status: 400 }
+      )
+    }
+
+    // Check if user already exists
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single()
+
+    if (existingUser) {
+      return NextResponse.json(
+        { error: 'User with this email already exists' },
+        { status: 409 }
+      )
+    }
+
+    // Hash the password
+    const hashedPassword = await hashPassword(password)
+
+    // Create user
+    const { data, error } = await supabase
+      .from('users')
+      .insert([
+        {
+          full_name,
+          email,
+          password: hashedPassword,
+          role: 'owner'
+        }
+      ])
+      .select('id, full_name, email, role, created_at')
+      .single()
+
+    if (error) {
+      console.error('Error creating user:', error)
+      return NextResponse.json(
+        { error: 'Failed to create user' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(
+      { 
+        message: 'User created successfully',
+        user: data 
+      },
+      { status: 201 }
+    )
+
+  } catch (error) {
+    console.error('Signup API error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
