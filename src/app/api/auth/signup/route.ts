@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { queryOne } from '@/lib/db'
 import { hashPassword, validatePasswordStrength } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
@@ -25,11 +25,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single()
+    const existingUser = await queryOne<{ id: number }>(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    )
 
     if (existingUser) {
       return NextResponse.json(
@@ -42,21 +41,15 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await hashPassword(password)
 
     // Create user
-    const { data, error } = await supabase
-      .from('users')
-      .insert([
-        {
-          full_name,
-          email,
-          password: hashedPassword,
-          role: 'owner'
-        }
-      ])
-      .select('id, full_name, email, role, created_at')
-      .single()
+    const data = await queryOne<{ id: number; full_name: string; email: string; role: string; created_at: string }>(
+      `INSERT INTO users (full_name, email, password, role)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, full_name, email, role, created_at`,
+      [full_name, email, hashedPassword, 'owner']
+    )
 
-    if (error) {
-      console.error('Error creating user:', error)
+    if (!data) {
+      console.error('Error creating user: No data returned')
       return NextResponse.json(
         { error: 'Failed to create user' },
         { status: 500 }

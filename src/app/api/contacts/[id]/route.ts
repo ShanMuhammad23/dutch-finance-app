@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Contact, UpdateContactInput } from '@/lib/types'
-import { supabase } from '@/lib/supabase'
+import { queryOne, query } from '@/lib/db'
 
 export async function GET(
   request: NextRequest,
@@ -27,24 +27,15 @@ export async function GET(
     }
 
     // Fetch contact from database with organization validation
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('*')
-      .eq('id', contactId)
-      .eq('organization_id', parseInt(organizationId))
-      .single()
+    const data = await queryOne<Contact>(
+      'SELECT * FROM contacts WHERE id = $1 AND organization_id = $2',
+      [contactId, parseInt(organizationId)]
+    )
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'Contact not found' },
-          { status: 404 }
-        )
-      }
-      console.error('Error fetching contact:', error)
+    if (!data) {
       return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
+        { error: 'Contact not found' },
+        { status: 404 }
       )
     }
 
@@ -83,33 +74,43 @@ export async function PUT(
       )
     }
 
-    // Update contact in database with organization validation
-    const { data, error } = await supabase
-      .from('contacts')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', contactId)
-      .eq('organization_id', parseInt(organizationId))
-      .select()
-      .single()
+    // Build dynamic UPDATE query based on provided fields
+    const updateFields: string[] = []
+    const updateValues: any[] = []
+    let paramIndex = 1
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json(
-          { error: 'Contact not found' },
-          { status: 404 }
-        )
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value !== undefined) {
+        updateFields.push(`${key} = $${paramIndex}`)
+        updateValues.push(value)
+        paramIndex++
       }
-      console.error('Error updating contact:', error)
+    })
+
+    updateFields.push(`updated_at = $${paramIndex}`)
+    updateValues.push(new Date().toISOString())
+    paramIndex++
+
+    // Add WHERE clause parameters
+    updateValues.push(contactId, parseInt(organizationId))
+
+    const updateQuery = `
+      UPDATE contacts
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramIndex} AND organization_id = $${paramIndex + 1}
+      RETURNING *
+    `
+
+    const result = await queryOne<Contact>(updateQuery, updateValues)
+
+    if (!result) {
       return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
+        { error: 'Contact not found' },
+        { status: 404 }
       )
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Error in PUT /api/contacts/[id]:', error)
     return NextResponse.json(
@@ -144,17 +145,15 @@ export async function DELETE(
     }
 
     // Delete contact from database with organization validation
-    const { error } = await supabase
-      .from('contacts')
-      .delete()
-      .eq('id', contactId)
-      .eq('organization_id', parseInt(organizationId))
+    const result = await query(
+      'DELETE FROM contacts WHERE id = $1 AND organization_id = $2',
+      [contactId, parseInt(organizationId)]
+    )
 
-    if (error) {
-      console.error('Error deleting contact:', error)
+    if (result.rowCount === 0) {
       return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
+        { error: 'Contact not found' },
+        { status: 404 }
       )
     }
 

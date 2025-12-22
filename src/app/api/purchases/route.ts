@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { supabase } from "@/lib/supabase";
+import { queryMany, queryOne } from "@/lib/db";
 import { CreatePurchaseInput, Purchase, PurchaseLine } from "@/lib/types";
 
 type SupabasePurchase = Omit<
@@ -51,43 +51,52 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
-      .from("purchases")
-      .select(
-        `
-          *,
-          lines:purchase_lines (
-            id,
-            purchase_id,
-            line_no,
-            description,
-            amount_incl_vat,
-            vat_amount,
-            account_code,
-            inventory_category,
-            created_at,
-            updated_at
-          )
-        `,
-      )
-      .eq("organization_id", parsedId)
-      .order("attachment_date", { ascending: false });
+    // Fetch purchases first
+    const purchasesData = await queryMany<any>(
+      "SELECT * FROM purchases WHERE organization_id = $1 ORDER BY attachment_date DESC",
+      [parsedId]
+    );
 
-    if (error) {
-      console.error("Error fetching purchases:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!purchasesData || purchasesData.length === 0) {
+      return NextResponse.json([]);
     }
 
-    const purchases =
-      data?.map((purchase) =>
-        buildPurchaseResponse(
-          {
-            ...purchase,
-            lines: undefined,
-          },
-          purchase.lines ?? undefined,
-        ),
-      ) ?? [];
+    // Fetch purchase lines for all purchases
+    const purchaseIds = purchasesData.map((p) => p.id);
+    let linesData: PurchaseLine[] = [];
+    
+    if (purchaseIds.length > 0) {
+      const placeholders = purchaseIds.map((_, i) => `$${i + 1}`).join(', ');
+      linesData = await queryMany<PurchaseLine>(
+        `SELECT * FROM purchase_lines 
+         WHERE purchase_id IN (${placeholders})
+         ORDER BY purchase_id ASC, line_no ASC`,
+        purchaseIds
+      );
+    }
+
+    // Group lines by purchase_id
+    const linesByPurchaseId = new Map<number, PurchaseLine[]>();
+    if (linesData) {
+      linesData.forEach((line) => {
+        const purchaseId = line.purchase_id;
+        if (!linesByPurchaseId.has(purchaseId)) {
+          linesByPurchaseId.set(purchaseId, []);
+        }
+        linesByPurchaseId.get(purchaseId)!.push(line as PurchaseLine);
+      });
+    }
+
+    // Combine purchases with their lines
+    const purchases = purchasesData.map((purchase) =>
+      buildPurchaseResponse(
+        {
+          ...purchase,
+          lines: undefined,
+        },
+        linesByPurchaseId.get(purchase.id),
+      ),
+    );
 
     return NextResponse.json(purchases);
   } catch (error) {
@@ -143,16 +152,23 @@ export async function POST(request: NextRequest) {
       attachment_name: body.attachment_name ?? null,
     };
 
-    const { data, error } = await supabase
-      .from("purchases")
-      .insert(insertPayload)
-      .select()
-      .single();
+    // Build INSERT query dynamically for purchases
+    const purchaseFields = Object.keys(insertPayload);
+    const purchaseValues = Object.values(insertPayload);
+    const purchasePlaceholders = purchaseFields.map((_, i) => `$${i + 1}`).join(', ');
+    const purchaseFieldNames = purchaseFields.join(', ');
 
-    if (error || !data) {
-      console.error("Error creating purchase:", error);
+    const data = await queryOne<any>(
+      `INSERT INTO purchases (${purchaseFieldNames})
+       VALUES (${purchasePlaceholders})
+       RETURNING *`,
+      purchaseValues
+    );
+
+    if (!data) {
+      console.error("Error creating purchase: No data returned");
       return NextResponse.json(
-        { error: error?.message ?? "Failed to create purchase" },
+        { error: "Failed to create purchase" },
         { status: 500 },
       );
     }
@@ -160,30 +176,33 @@ export async function POST(request: NextRequest) {
     let insertedLines: PurchaseLine[] | undefined = undefined;
 
     if (Array.isArray(body.lines) && body.lines.length > 0) {
-      const linesPayload = body.lines.map((line) => ({
-        purchase_id: data.id,
-        line_no: line.line_no,
-        description: line.description,
-        amount_incl_vat: line.amount_incl_vat,
-        vat_amount: line.vat_amount,
-        account_code: line.account_code ?? null,
-        inventory_category: line.inventory_category ?? null,
-      }));
+      // Insert all lines in a single query using VALUES
+      const linesValues: any[] = [];
+      const linesPlaceholders: string[] = [];
+      let paramIndex = 1;
 
-      const { data: linesData, error: linesError } = await supabase
-        .from("purchase_lines")
-        .insert(linesPayload)
-        .select();
-
-      if (linesError) {
-        console.error("Error inserting purchase lines:", linesError);
-        return NextResponse.json(
-          { error: linesError.message },
-          { status: 500 },
+      body.lines.forEach((line) => {
+        linesPlaceholders.push(
+          `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6})`
         );
-      }
+        linesValues.push(
+          data.id,
+          line.line_no,
+          line.description,
+          line.amount_incl_vat,
+          line.vat_amount,
+          line.account_code ?? null,
+          line.inventory_category ?? null
+        );
+        paramIndex += 7;
+      });
 
-      insertedLines = linesData ?? undefined;
+      insertedLines = await queryMany<PurchaseLine>(
+        `INSERT INTO purchase_lines (purchase_id, line_no, description, amount_incl_vat, vat_amount, account_code, inventory_category)
+         VALUES ${linesPlaceholders.join(', ')}
+         RETURNING *`,
+        linesValues
+      );
     }
 
     const fallbackLines: PurchaseLine[] | undefined = body.lines

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Contact, CreateContactInput } from '@/lib/types'
-import { supabase } from '@/lib/supabase'
+import { queryMany, queryOne } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,19 +15,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch contacts from database filtered by organization
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('*')
-      .eq('organization_id', parseInt(organizationId))
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching contacts:', error)
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      )
-    }
+    const data = await queryMany<Contact>(
+      'SELECT * FROM contacts WHERE organization_id = $1 ORDER BY created_at DESC',
+      [parseInt(organizationId)]
+    )
 
     return NextResponse.json(data || [])
   } catch (error) {
@@ -52,27 +43,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new contact in database
-    const { data, error } = await supabase
-      .from('contacts')
-      .insert({
-        organization_id: body.organization_id,
-        contact_type: body.contact_type,
-        name: body.name,
-        email: body.email,
-        phone: body.phone,
-        address_line: body.address_line,
-        postal_code: body.postal_code,
-        city: body.city,
-        country: body.country || 'Denmark',
-        vat_number: body.vat_number,
-      })
-      .select()
-      .single()
+    const data = await queryOne<Contact>(
+      `INSERT INTO contacts (organization_id, contact_type, name, email, phone, address_line, postal_code, city, country, vat_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      [
+        body.organization_id,
+        body.contact_type,
+        body.name,
+        body.email,
+        body.phone,
+        body.address_line,
+        body.postal_code,
+        body.city,
+        body.country || 'Denmark',
+        body.vat_number,
+      ]
+    )
 
-    if (error) {
-      console.error('Error creating contact:', error)
+    if (!data) {
+      console.error('Error creating contact: No data returned')
       return NextResponse.json(
-        { error: error.message },
+        { error: 'Failed to create contact' },
         { status: 500 }
       )
     }

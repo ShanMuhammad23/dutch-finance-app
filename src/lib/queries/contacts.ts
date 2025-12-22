@@ -57,9 +57,12 @@ export function useUpdateContact(organizationId?: number) {
 	return useMutation({
 		mutationKey: ['update-contact', organizationId],
 		mutationFn: async (input: UpdateContactInput): Promise<Contact> => {
+			if (!organizationId) {
+				throw new Error('Organization ID is required')
+			}
 			const { id, ...updates } = input
-			const response = await fetch(`/api/contacts/${id}`, {
-				method: 'PATCH',
+			const response = await fetch(`/api/contacts/${id}?organizationId=${organizationId}`, {
+				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(updates),
 			})
@@ -99,7 +102,10 @@ export function useDeleteContact(organizationId?: number) {
 	return useMutation({
 		mutationKey: ['delete-contact', organizationId],
 		mutationFn: async (id: number): Promise<{ id: number }> => {
-			const response = await fetch(`/api/contacts/${id}`, { method: 'DELETE' })
+			if (!organizationId) {
+				throw new Error('Organization ID is required')
+			}
+			const response = await fetch(`/api/contacts/${id}?organizationId=${organizationId}`, { method: 'DELETE' })
 			if (!response.ok) {
 				const error = await response.json().catch(() => ({}))
 				throw new Error(error.error || 'Failed to delete contact')

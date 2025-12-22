@@ -65,6 +65,41 @@ function getDueDateStyle(dueDate?: string | null) {
   };
 }
 
+function getStatusStyle(status: string) {
+  switch (status) {
+    case "paid":
+      return {
+        label: "Paid",
+        className: "bg-[#219653]/[0.08] text-[#219653]",
+      };
+    case "cancelled":
+      return {
+        label: "Cancelled",
+        className: "bg-[#D34053]/[0.08] text-[#D34053]",
+      };
+    case "overdue":
+      return {
+        label: "Overdue",
+        className: "bg-[#D34053]/[0.08] text-[#D34053]",
+      };
+    case "sent":
+      return {
+        label: "Sent",
+        className: "bg-[#2563EB]/[0.08] text-[#2563EB]",
+      };
+    case "draft":
+      return {
+        label: "Draft",
+        className: "bg-slate-100 text-slate-600 dark:bg-dark-3 dark:text-white/70",
+      };
+    default:
+      return {
+        label: status,
+        className: "bg-slate-100 text-slate-600 dark:bg-dark-3 dark:text-white/70",
+      };
+  }
+}
+
 function SkeletonRows() {
   return (
     <>
@@ -79,6 +114,9 @@ function SkeletonRows() {
           <TableCell>
             <Skeleton className="h-6 w-32 rounded-full" />
           </TableCell>
+          <TableCell>
+            <Skeleton className="h-6 w-24 rounded-full" />
+          </TableCell>
           <TableCell className="xl:pr-7.5">
             <Skeleton className="h-4 w-40" />
           </TableCell>
@@ -87,6 +125,9 @@ function SkeletonRows() {
           </TableCell>
           <TableCell className="xl:pr-7.5">
             <Skeleton className="h-4 w-24" />
+          </TableCell>
+          <TableCell className="xl:pr-7.5">
+            <Skeleton className="h-4 w-20" />
           </TableCell>
         </TableRow>
       ))}
@@ -118,9 +159,11 @@ export function InvoiceTable() {
             <TableHead className="min-w-[155px] xl:pl-7.5">#</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Due Date</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead>Description</TableHead>
             <TableHead>Customer</TableHead>
             <TableHead>Total</TableHead>
+            <TableHead>Late Fee</TableHead>
           </TableRow>
         </TableHeader>
 
@@ -129,7 +172,7 @@ export function InvoiceTable() {
 
           {!showSkeleton && isError && (
             <TableRow className="border-[#eee] dark:border-dark-3">
-              <TableCell colSpan={6} className="py-10 text-center">
+              <TableCell colSpan={8} className="py-10 text-center">
                 <div className="mx-auto flex max-w-md flex-col items-center gap-3 text-sm text-slate-600 dark:text-white/70">
                   <p>We couldn&apos;t load the invoices for this organization.</p>
                   {error instanceof Error && (
@@ -148,7 +191,7 @@ export function InvoiceTable() {
 
           {!showSkeleton && !isError && invoices.length === 0 && (
             <TableRow className="border-[#eee] dark:border-dark-3">
-              <TableCell colSpan={6} className="py-12 text-center">
+              <TableCell colSpan={8} className="py-12 text-center">
                 <div className="mx-auto max-w-lg space-y-2 text-sm text-slate-600 dark:text-white/70">
                   <p className="font-medium text-dark dark:text-white">
                     No invoices found
@@ -167,6 +210,7 @@ export function InvoiceTable() {
             !isError &&
             invoices.map((invoice) => {
               const dueDateMeta = getDueDateStyle(invoice.due_date);
+              const statusMeta = getStatusStyle(invoice.status);
               const issueDate = invoice.issue_date
                 ? dayjs(invoice.issue_date).format("MMM DD, YYYY")
                 : "—";
@@ -176,6 +220,7 @@ export function InvoiceTable() {
                 "—";
               const customer = invoice.contact?.name ?? "—";
               const formattedTotal = formatCurrency(invoice.total_amount ?? 0, invoice.currency);
+              const formattedLateFee = formatCurrency(invoice.late_fee ?? 0, invoice.currency);
 
               return (
                 <TableRow key={invoice.id} className="border-[#eee] dark:border-dark-3">
@@ -200,6 +245,17 @@ export function InvoiceTable() {
                     </div>
                   </TableCell>
 
+                  <TableCell>
+                    <div
+                      className={cn(
+                        "max-w-fit rounded-full px-3.5 py-1 text-sm font-medium capitalize",
+                        statusMeta.className,
+                      )}
+                    >
+                      {statusMeta.label}
+                    </div>
+                  </TableCell>
+
                   <TableCell className="xl:pr-7.5">
                     <p className="mt-[3px] text-body-sm font-medium">{description}</p>
                   </TableCell>
@@ -210,6 +266,10 @@ export function InvoiceTable() {
 
                   <TableCell className="xl:pr-7.5">
                     <p className="mt-[3px] text-body-sm font-medium">{formattedTotal}</p>
+                  </TableCell>
+
+                  <TableCell className="xl:pr-7.5">
+                    <p className="mt-[3px] text-body-sm font-medium">{formattedLateFee}</p>
                   </TableCell>
                 </TableRow>
               );

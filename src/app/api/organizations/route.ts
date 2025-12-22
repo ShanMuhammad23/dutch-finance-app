@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { queryMany, queryOne } from '@/lib/db';
 
 // GET all organizations for a user
 export async function GET(request: NextRequest) {
@@ -14,19 +14,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
-      .from('organizations')
-      .select('*')
-      .eq('created_by', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching organizations:', error);
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
-    }
+    const data = await queryMany(
+      'SELECT * FROM organizations WHERE created_by = $1 ORDER BY created_at DESC',
+      [userId]
+    );
 
     return NextResponse.json(data);
   } catch (error) {
@@ -58,19 +49,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
-      .from('organizations')
-      .insert({
-        ...organizationData,
-        created_by: userId,
-      })
-      .select()
-      .single();
+    // Build INSERT query dynamically
+    const fields = Object.keys(organizationData)
+    const values = Object.values(organizationData)
+    const placeholders = fields.map((_, i) => `$${i + 1}`).join(', ')
+    const fieldNames = fields.join(', ')
 
-    if (error) {
-      console.error('Error creating organization:', error);
+    const data = await queryOne(
+      `INSERT INTO organizations (${fieldNames}, created_by)
+       VALUES (${placeholders}, $${fields.length + 1})
+       RETURNING *`,
+      [...values, userId]
+    );
+
+    if (!data) {
+      console.error('Error creating organization: No data returned');
       return NextResponse.json(
-        { error: error.message },
+        { error: 'Failed to create organization' },
         { status: 500 }
       );
     }

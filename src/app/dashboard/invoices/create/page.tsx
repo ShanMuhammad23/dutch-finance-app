@@ -9,10 +9,15 @@ import { InvoiceActions } from "@/components/invoices/invoice-actions"
 import { ContactInfoDisplay } from "@/components/invoices/contact-info-display"
 import { useActiveOrganization } from "@/context/organization-context"
 import { useInvoiceForm } from "@/hooks/use-invoice-form"
+import { useOrganizationProducts } from "@/lib/queries/products"
 
 export default function InvoicesPage() {
   const { organizationIdAsNumber, isLoading: organizationLoading, isReady, activeOrganization } = useActiveOrganization()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const { data: products = [], isLoading: productsLoading } = useOrganizationProducts(
+    organizationIdAsNumber ?? undefined
+  )
 
   const {
     selectedContactId,
@@ -137,7 +142,12 @@ export default function InvoicesPage() {
 
           <div className="rounded-2xl border bg-white p-0 shadow-sm dark:border-dark-3 dark:bg-dark-2">
             <div className="p-6">
-              <InvoiceItemsTable items={items} onItemsChange={setItems} />
+              <InvoiceItemsTable 
+                items={items} 
+                onItemsChange={setItems}
+                products={products}
+                productsLoading={productsLoading}
+              />
             </div>
           </div>
         </div>

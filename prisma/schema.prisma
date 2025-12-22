@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        BigInt   @id @default(autoincrement()) @db.BigInt
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  fullName  String?  @default("") @map("full_name") @db.VarChar
+  email     String?  @default("") @db.VarChar
+  role      String?  @default("owner") @db.VarChar
+  password  String?  @db.Text
+
+  organizations Organization[]
+  invoices      Invoice[]
+
+  @@map("users")
+}
+
+model Organization {
+  id                      BigInt    @id @default(autoincrement()) @db.BigInt
+  createdBy               BigInt    @map("created_by") @db.BigInt
+  businessType            String    @map("business_type") @db.VarChar
+  companyName             String    @map("company_name") @db.VarChar
+  addressLine             String?   @map("address_line") @db.VarChar
+  postalCode              String?   @map("postal_code") @db.VarChar
+  city                    String?   @db.VarChar
+  country                 String?   @default("Denmark") @db.VarChar
+  email                   String?   @db.VarChar
+  attentionPerson         String?   @map("attention_person") @db.VarChar
+  vatNumber               String?   @map("vat_number") @db.VarChar
+  currency                String?   @default("DKK") @db.VarChar
+  status                  String?   @default("active") @db.VarChar
+  subscriptionPlan        String?   @default("free") @map("subscription_plan") @db.VarChar
+  dataProcessingAgreement Boolean?  @default(false) @map("data_processing_agreement")
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  creator   User        @relation(fields: [createdBy], references: [id])
+  contacts  Contact[]
+  invoices  Invoice[]
+  products  Product[]
+  purchases Purchase[]
+
+  @@map("organizations")
+}
+
+model Contact {
+  id             BigInt    @id @default(autoincrement()) @db.BigInt
+  organizationId BigInt    @map("organization_id") @db.BigInt
+  contactType    String?   @default("company") @map("contact_type") @db.VarChar
+  name           String    @db.VarChar
+  email          String?   @db.VarChar
+  phone          String?   @db.VarChar
+  addressLine    String?   @map("address_line") @db.VarChar
+  postalCode     String?   @map("postal_code") @db.VarChar
+  city           String?   @db.VarChar
+  country        String?   @default("Denmark") @db.VarChar
+  vatNumber      String?   @map("vat_number") @db.VarChar
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  invoices     Invoice[]
+
+  @@map("contacts")
+}
+
+model Invoice {
+  id            BigInt        @id @default(autoincrement()) @db.BigInt
+  organizationId BigInt       @map("organization_id") @db.BigInt
+  contactId     BigInt?       @map("contact_id") @db.BigInt
+  createdBy     BigInt?       @map("created_by") @db.BigInt
+  invoiceNumber Int           @default(autoincrement()) @map("invoice_number") @db.Integer
+  issueDate     DateTime      @default(now()) @map("issue_date") @db.Date
+  dueDate       DateTime?     @map("due_date") @db.Date
+  paymentTerms  String?       @default("Net 8 days") @map("payment_terms") @db.VarChar
+  status        String?       @default("draft") @db.VarChar
+  comments      String?       @db.Text
+  subtotal      Decimal?      @default(0) @db.Decimal
+  discountTotal Decimal?      @default(0) @map("discount_total") @db.Decimal
+  taxTotal      Decimal?      @default(0) @map("tax_total") @db.Decimal
+  totalAmount   Decimal?      @default(0) @map("total_amount") @db.Decimal
+  currency      String?       @default("DKK") @db.VarChar
+  bankRegNo     String?       @map("bank_reg_no") @db.VarChar
+  bankAccountNo String?        @map("bank_account_no") @db.VarChar
+  interestRate  Decimal?      @default(0.81) @map("interest_rate") @db.Decimal
+  lateFee       Decimal?      @default(100.00) @map("late_fee") @db.Decimal
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  isPublished   Boolean?      @default(false) @map("is_published")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  contact      Contact?      @relation(fields: [contactId], references: [id])
+  creator      User?         @relation(fields: [createdBy], references: [id])
+  items        InvoiceItem[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          BigInt   @id @default(autoincrement()) @db.BigInt
+  invoiceId  BigInt   @map("invoice_id") @db.BigInt
+  description String   @db.Text
+  quantity    Decimal? @default(1) @db.Decimal
+  unit        String?  @default("pcs") @db.VarChar
+  unitPrice   Decimal? @default(0) @map("unit_price") @db.Decimal
+  discount    Decimal? @default(0) @db.Decimal
+  lineTotal   Decimal? @map("line_total") @db.Decimal
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@map("invoice_items")
+}
+
+model Product {
+  id             BigInt    @id @default(autoincrement()) @db.BigInt
+  organizationId BigInt    @map("organization_id") @db.BigInt
+  name           String    @db.Text
+  productCode    String?   @map("product_code") @db.Text
+  quantity       Decimal   @default(1) @db.Decimal
+  unit           String?   @db.Text
+  priceExclVat   Decimal   @default(0) @map("price_excl_vat") @db.Decimal
+  accountCode    String    @map("account_code") @db.Text
+  comment        String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("products")
+}
+
+model Purchase {
+  id               BigInt      @id @default(autoincrement()) @db.BigInt
+  organizationId   BigInt      @map("organization_id") @db.BigInt
+  supplierName     String      @map("supplier_name") @db.Text
+  paymentType      String      @map("payment_type") @db.Text
+  attachmentDate   DateTime    @map("attachment_date") @db.Date
+  inventoryCategory String?     @map("inventory_category") @db.Text
+  accountCode      String?     @map("account_code") @db.Text
+  description      String?     @db.Text
+  amountInclVat    Decimal     @default(0) @map("amount_incl_vat") @db.Decimal
+  vatAmount        Decimal     @default(0) @map("vat_amount") @db.Decimal
+  subtotal         Decimal     @default(0) @db.Decimal
+  totalAmount      Decimal     @default(0) @map("total_amount") @db.Decimal
+  status           String      @default("draft") @db.Text
+  attachmentUrl    String?     @map("attachment_url") @db.Text
+  attachmentName   String?     @map("attachment_name") @db.Text
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  lines         PurchaseLine[]
+
+  @@map("purchases")
+}
+
+model PurchaseLine {
+  id               BigInt    @id @default(autoincrement()) @db.BigInt
+  purchaseId       BigInt    @map("purchase_id") @db.BigInt
+  lineNo           Int       @map("line_no") @db.Integer
+  description      String    @db.Text
+  amountInclVat    Decimal   @map("amount_incl_vat") @db.Decimal
+  vatAmount        Decimal   @default(0) @map("vat_amount") @db.Decimal
+  accountCode      String?   @map("account_code") @db.VarChar
+  inventoryCategory String?   @map("inventory_category") @db.VarChar
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+
+  @@map("purchase_lines")
+}

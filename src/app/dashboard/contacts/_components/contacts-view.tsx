@@ -9,6 +9,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   useCreateContact,
   useDeleteContact,
   useOrganizationContacts,
@@ -18,6 +26,7 @@ import type { Contact } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useMemo, useState } from "react";
 import { useActiveOrganization } from "@/context/organization-context";
+import { toast } from "sonner";
 
 type FormState = {
   contact_type: Contact["contact_type"];
@@ -60,6 +69,8 @@ export function ContactsView({ className }: ContactsViewProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [formState, setFormState] = useState<FormState>(emptyFormState);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
 
   const {
     data: contacts = [],
@@ -162,21 +173,33 @@ export function ContactsView({ className }: ContactsViewProps) {
     }
   };
 
-  const handleDelete = async (contact: Contact) => {
-    const shouldDelete = window.confirm(
-      `Delete contact “${contact.name}”? This cannot be undone.`,
-    );
+  const handleDeleteClick = (contact: Contact) => {
+    if (!organizationId) {
+      setFormError("Select an organization before deleting contacts.");
+      return;
+    }
+    setContactToDelete(contact);
+    setIsDeleteDialogOpen(true);
+  };
 
-    if (!shouldDelete) return;
+  const handleConfirmDelete = async () => {
+    if (!contactToDelete || !organizationId) return;
 
     try {
-      await deleteContact.mutateAsync(contact.id);
+      await deleteContact.mutateAsync(contactToDelete.id);
+      toast.success("Contact deleted successfully", {
+        description: `"${contactToDelete.name}" has been removed.`,
+      });
+      setIsDeleteDialogOpen(false);
+      setContactToDelete(null);
     } catch (mutationError) {
       const message =
         mutationError instanceof Error
           ? mutationError.message
           : "Failed to delete contact. Please try again.";
-      setFormError(message);
+      toast.error("Failed to delete contact", {
+        description: message,
+      });
     }
   };
 
@@ -415,7 +438,7 @@ export function ContactsView({ className }: ContactsViewProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDelete(contact)}
+                    onClick={() => handleDeleteClick(contact)}
                     className="rounded-md border border-stroke px-3 py-1 text-xs font-medium uppercase tracking-wide text-red transition hover:border-red hover:bg-red/10 hover:text-red"
                   >
                     Delete
@@ -426,6 +449,38 @@ export function ContactsView({ className }: ContactsViewProps) {
           </TableBody>
         </Table>
       </div>
+
+      <Dialog isOpen={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Contact</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{contactToDelete?.name}"? This
+              action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setContactToDelete(null);
+              }}
+              className="inline-flex items-center justify-center rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-dark transition hover:border-primary hover:text-primary dark:border-dark-3 dark:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={deleteContact.isPending}
+              className="inline-flex items-center justify-center rounded-lg bg-red px-4 py-2 text-sm font-medium text-white transition hover:bg-opacity-90 disabled:cursor-not-allowed disabled:bg-opacity-60"
+            >
+              {deleteContact.isPending ? "Deleting..." : "Delete"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

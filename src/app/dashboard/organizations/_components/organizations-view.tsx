@@ -4,9 +4,11 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveOrganization } from "@/context/organization-context";
 import { cn } from "@/lib/utils";
-import { Building2, RefreshCw, ShieldCheck } from "lucide-react";
+import { Building2, RefreshCw, ShieldCheck, UploadIcon, Loader2 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 function formatDate(value?: string | null) {
   if (!value) {
@@ -45,6 +47,123 @@ export function OrganizationsView() {
     userId,
   } = useActiveOrganization();
 
+  const [pendingLogoOrgId, setPendingLogoOrgId] = useState<string | null>(null);
+  const [uploadingOrgId, setUploadingOrgId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const getLogoSrc = (logo?: string | null) => {
+    if (!logo) return null;
+
+    // If the stored value is already a path (e.g. "/attachments/logo.png" or "images/foo.png"),
+    // use it as-is. Otherwise, assume it's a bare file name in the attachments folder.
+    if (logo.startsWith("/") || logo.includes("/")) {
+      return logo;
+    }
+
+    return `/attachments/${logo}`;
+  };
+
+  const handleLogoFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const organizationId = pendingLogoOrgId;
+    const file = event.target.files?.[0];
+
+    // Reset input value so selecting the same file again still triggers onChange
+    event.target.value = "";
+
+    if (!organizationId || !file) {
+      return;
+    }
+
+    if (!userId) {
+      toast.error("You must be logged in to update the organization logo.");
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Invalid file type. Please upload an image (JPG, PNG, GIF, WEBP).");
+      return;
+    }
+
+    // Validate size (20 MB)
+    const maxSize = 20 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error("File size exceeds 20 MB limit.");
+      return;
+    }
+
+    try {
+      setUploadingOrgId(organizationId);
+
+      // Upload file to attachments folder using existing upload endpoint
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadResponse = await fetch("/api/purchases/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.json().catch(() => ({}));
+        throw new Error(error.error || "Failed to upload logo");
+      }
+
+      const uploadData: {
+        filePath: string;
+        storedFileName?: string;
+        originalFileName?: string;
+      } = await uploadResponse.json();
+
+      // Use storedFileName if provided, otherwise derive from filePath
+      const storedFileName =
+        uploadData.storedFileName ||
+        uploadData.filePath.split("/").filter(Boolean).pop();
+
+      if (!storedFileName) {
+        throw new Error("Upload did not return a valid stored file name.");
+      }
+
+      // Save logo file name on organization (we store the actual stored filename)
+      const updateResponse = await fetch(`/api/organizations/${organizationId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId,
+          logo: storedFileName,
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        const error = await updateResponse.json().catch(() => ({}));
+        throw new Error(error.error || "Failed to save logo on organization");
+      }
+
+      toast.success("Organization logo updated successfully.");
+      await refetch();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while updating the logo.";
+      toast.error(message);
+    } finally {
+      setUploadingOrgId(null);
+      setPendingLogoOrgId(null);
+    }
+  };
+
   const isEmpty = !isLoading && organizations.length === 0;
 
   const organizationCards = useMemo(
@@ -52,15 +171,29 @@ export function OrganizationsView() {
       organizations.map((organization) => {
         const organizationId = String(organization.id);
         const isActive = organizationId === selectedOrganizationId;
+        const isUploading = uploadingOrgId === organizationId;
+
         return (
           <Card
             key={organizationId}
             className="flex h-full flex-col gap-5 p-6 transition hover:shadow-md"
           >
             <header className="flex items-start gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Building2 className="h-5 w-5" aria-hidden="true" />
-              </span>
+              {getLogoSrc(organization.logo) ? (
+                <div className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-stroke bg-white dark:border-dark-3 dark:bg-gray-dark">
+                  <Image
+                    src={getLogoSrc(organization.logo)!}
+                    alt={`${organization.company_name} logo`}
+                    fill
+                    className="object-cover"
+                    sizes="44px"
+                  />
+                </div>
+              ) : (
+                <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Building2 className="h-5 w-5" aria-hidden="true" />
+                </span>
+              )}
 
               <div className="flex-1">
                 <h2 className="text-lg font-semibold text-dark dark:text-white">
@@ -107,7 +240,7 @@ export function OrganizationsView() {
               <button
                 type="button"
                 onClick={() => selectOrganization(organizationId)}
-                disabled={isActive}
+                disabled={isActive || isUploading}
                 className={cn(
                   "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                   isActive
@@ -116,6 +249,30 @@ export function OrganizationsView() {
                 )}
               >
                 {isActive ? "Current organization" : "Set as active"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingLogoOrgId(organizationId);
+                  fileInputRef.current?.click();
+                }}
+                disabled={isUploading}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-lg border border-stroke px-4 py-2 text-sm font-medium text-dark transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 dark:border-dark-3 dark:text-white",
+                )}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    Uploading logo...
+                  </>
+                ) : (
+                  <>
+                    <UploadIcon className="h-4 w-4" aria-hidden="true" />
+                    Upload logo
+                  </>
+                )}
               </button>
 
               {organization.email && (
@@ -130,7 +287,7 @@ export function OrganizationsView() {
           </Card>
         );
       }),
-    [organizations, selectOrganization, selectedOrganizationId],
+    [organizations, selectOrganization, selectedOrganizationId, uploadingOrgId],
   );
 
   return (
@@ -164,11 +321,11 @@ export function OrganizationsView() {
         </button>
       </div>
 
-      {error && (
+      {error ? (
         <div className="rounded-lg border border-red/20 bg-red/10 px-4 py-3 text-sm text-red">
           Unable to load organizations right now. Please try again.
         </div>
-      )}
+      ) : null}
 
       {isLoading && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -206,9 +363,20 @@ export function OrganizationsView() {
       )}
 
       {!isLoading && !isEmpty && (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {organizationCards}
-        </div>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {organizationCards}
+          </div>
+
+          {/* Hidden file input used for logo uploads */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+            className="hidden"
+            onChange={handleLogoFileChange}
+          />
+        </>
       )}
     </section>
   );

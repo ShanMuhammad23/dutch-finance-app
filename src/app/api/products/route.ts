@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { supabase } from "@/lib/supabase";
+import { queryMany, queryOne } from "@/lib/db";
 import { CreateProductInput, Product, ProductAccountCode } from "@/lib/types";
 
 const ACCOUNT_CODES: Record<ProductAccountCode, string> = {
@@ -41,18 +41,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .eq("organization_id", parsedId)
-      .order("updated_at", { ascending: false });
+    const data = await queryMany<Product>(
+      "SELECT * FROM products WHERE organization_id = $1 ORDER BY updated_at DESC",
+      [parsedId]
+    );
 
-    if (error) {
-      console.error("Error fetching products:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json((data ?? []) as Product[]);
+    return NextResponse.json(data ?? []);
   } catch (error) {
     console.error("Error in GET /api/products:", error);
     return NextResponse.json(
@@ -96,16 +90,26 @@ export async function POST(request: NextRequest) {
       comment: body.comment ?? null,
     };
 
-    const { data, error } = await supabase
-      .from("products")
-      .insert(insertPayload)
-      .select()
-      .single();
+    const data = await queryOne<Product>(
+      `INSERT INTO products (organization_id, name, product_code, quantity, unit, price_excl_vat, account_code, comment)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [
+        insertPayload.organization_id,
+        insertPayload.name,
+        insertPayload.product_code,
+        insertPayload.quantity,
+        insertPayload.unit,
+        insertPayload.price_excl_vat,
+        insertPayload.account_code,
+        insertPayload.comment,
+      ]
+    );
 
-    if (error || !data) {
-      console.error("Error creating product:", error);
+    if (!data) {
+      console.error("Error creating product: No data returned");
       return NextResponse.json(
-        { error: error?.message ?? "Failed to create product" },
+        { error: "Failed to create product" },
         { status: 500 },
       );
     }

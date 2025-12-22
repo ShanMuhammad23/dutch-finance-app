@@ -126,9 +126,8 @@ export function useInvoiceForm({ organizationId }: UseInvoiceFormArgs): UseInvoi
         throw new Error("Add at least one invoice line before continuing.")
       }
 
-      return {
+      const payload: CreateInvoiceInput = {
         organization_id: organizationId,
-        contact_id: selectedContactId,
         issue_date: issueDate,
         due_date: dueDate || undefined,
         payment_terms: paymentTerms,
@@ -141,6 +140,13 @@ export function useInvoiceForm({ organizationId }: UseInvoiceFormArgs): UseInvoi
         status: mode,
         items: preparedItems,
       }
+
+      // Explicitly include contact_id if a contact is selected
+      if (selectedContactId !== undefined && selectedContactId !== null) {
+        payload.contact_id = selectedContactId
+      }
+
+      return payload
     },
     [
       bankAccountNo,

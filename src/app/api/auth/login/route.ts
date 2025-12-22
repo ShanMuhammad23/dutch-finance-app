@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { queryOne } from '@/lib/db'
 import { comparePassword } from '@/lib/auth'
-
+import postgres from 'postgres'
+const sql = postgres(process.env.DATABASE_URL!, { 
+  ssl: 'require' 
+})
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -16,13 +19,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Find user by email
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single()
+    const user = await sql`SELECT * FROM users WHERE email = ${email}`
 
-    if (error || !user) {
+    if (!user[0]) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
@@ -32,12 +31,12 @@ export async function POST(request: NextRequest) {
     // Compare password - handle both hashed and plain text passwords
     let isPasswordValid = false
     
-    if (user.password.startsWith('$2b$')) {
+    if (user[0].password.startsWith('$2b$')) {
       // Password is hashed, use bcrypt comparison
-      isPasswordValid = await comparePassword(password, user.password)
+      isPasswordValid = await comparePassword(password, user[0].password)
     } else {
       // Password is plain text (legacy), compare directly
-      isPasswordValid = password === user.password
+      isPasswordValid = password === user[0].password
     }
     
     if (!isPasswordValid) {
@@ -48,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Remove password from response
-    const { password: _, ...userWithoutPassword } = user
+    const { password: _, ...userWithoutPassword } = user[0]
 
     return NextResponse.json(
       { 

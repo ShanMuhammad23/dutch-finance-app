@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { calculateInvoiceTotals, calculateLineTotal } from '@/lib/invoice-utils'
-import { supabase } from '@/lib/supabase'
+import { queryMany, queryOne } from '@/lib/db'
 import { CreateInvoiceInput } from '@/lib/types'
 
 export async function GET(request: NextRequest) {
@@ -25,21 +25,35 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('organization_id', parsedId)
-      .order('created_at', { ascending: false })
+    const data = await queryMany<any>(
+      `SELECT 
+        i.*,
+        json_build_object(
+          'id', c.id,
+          'name', c.name,
+          'email', c.email,
+          'phone', c.phone,
+          'contact_type', c.contact_type,
+          'address_line', c.address_line,
+          'postal_code', c.postal_code,
+          'city', c.city,
+          'country', c.country,
+          'vat_number', c.vat_number
+        ) as contact
+      FROM invoices i
+      LEFT JOIN contacts c ON i.contact_id = c.id
+      WHERE i.organization_id = $1
+      ORDER BY i.created_at DESC`,
+      [parsedId]
+    )
 
-    if (error) {
-      console.error('Error fetching invoices:', error)
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 },
-      )
-    }
+    // Transform the response to match the expected Invoice type structure
+    const transformedData = data.map((invoice: any) => ({
+      ...invoice,
+      contact: invoice.contact || null,
+    }))
 
-    return NextResponse.json(data ?? [])
+    return NextResponse.json(transformedData)
   } catch (error) {
     console.error('Error in GET /api/invoices:', error)
     return NextResponse.json(
@@ -76,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     const invoicePayload: Record<string, unknown> = {
       organization_id: body.organization_id,
-      contact_id: body.contact_id ?? null,
+      contact_id: typeof body.contact_id === 'number' ? body.contact_id : null,
       created_by: null,
       issue_date: body.issue_date,
       due_date: body.due_date ?? null,
@@ -99,16 +113,23 @@ export async function POST(request: NextRequest) {
       invoicePayload.invoice_number = body.invoice_number
     }
 
-    const { data, error } = await supabase
-      .from('invoices')
-      .insert(invoicePayload)
-      .select()
-      .single()
+    // Build INSERT query dynamically
+    const fields = Object.keys(invoicePayload)
+    const values = Object.values(invoicePayload)
+    const placeholders = fields.map((_, i) => `$${i + 1}`).join(', ')
+    const fieldNames = fields.join(', ')
 
-    if (error) {
-      console.error('Error creating invoice:', error)
+    const data = await queryOne<any>(
+      `INSERT INTO invoices (${fieldNames})
+       VALUES (${placeholders})
+       RETURNING *`,
+      values
+    )
+
+    if (!data) {
+      console.error('Error creating invoice: No data returned')
       return NextResponse.json(
-        { error: error.message },
+        { error: 'Failed to create invoice' },
         { status: 500 },
       )
     }

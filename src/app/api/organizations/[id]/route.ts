@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { queryOne, query } from '@/lib/db';
 
 // GET single organization
 export async function GET(
@@ -18,17 +18,14 @@ export async function GET(
       );
     }
 
-    const { data, error } = await supabase
-      .from('organizations')
-      .select('*')
-      .eq('id', id)
-      .eq('created_by', userId)
-      .single();
+    const data = await queryOne(
+      'SELECT * FROM organizations WHERE id = $1 AND created_by = $2',
+      [id, userId]
+    );
 
-    if (error) {
-      console.error('Error fetching organization:', error);
+    if (!data) {
       return NextResponse.json(
-        { error: error.message },
+        { error: 'Organization not found' },
         { status: 404 }
       );
     }
@@ -60,22 +57,39 @@ export async function PUT(
       );
     }
 
-    const { data, error } = await supabase
-      .from('organizations')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .eq('created_by', userId)
-      .select()
-      .single();
+    // Build dynamic UPDATE query based on provided fields
+    const updateFields: string[] = []
+    const updateValues: any[] = []
+    let paramIndex = 1
 
-    if (error) {
-      console.error('Error updating organization:', error);
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value !== undefined) {
+        updateFields.push(`${key} = $${paramIndex}`)
+        updateValues.push(value)
+        paramIndex++
+      }
+    })
+
+    updateFields.push(`updated_at = $${paramIndex}`)
+    updateValues.push(new Date().toISOString())
+    paramIndex++
+
+    // Add WHERE clause parameters
+    updateValues.push(id, userId)
+
+    const updateQuery = `
+      UPDATE organizations
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramIndex} AND created_by = $${paramIndex + 1}
+      RETURNING *
+    `
+
+    const data = await queryOne(updateQuery, updateValues)
+
+    if (!data) {
       return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
+        { error: 'Organization not found' },
+        { status: 404 }
       );
     }
 
@@ -106,17 +120,15 @@ export async function DELETE(
       );
     }
 
-    const { error } = await supabase
-      .from('organizations')
-      .delete()
-      .eq('id', id)
-      .eq('created_by', userId);
+    const result = await query(
+      'DELETE FROM organizations WHERE id = $1 AND created_by = $2',
+      [id, userId]
+    );
 
-    if (error) {
-      console.error('Error deleting organization:', error);
+    if (result.rowCount === 0) {
       return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
+        { error: 'Organization not found' },
+        { status: 404 }
       );
     }
 

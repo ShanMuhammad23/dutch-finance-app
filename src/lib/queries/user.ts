@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { queryOne } from "../db";
 import { User } from "../types";
 
 export async function getUser(userId?: number): Promise<User | null> {
@@ -7,33 +7,31 @@ export async function getUser(userId?: number): Promise<User | null> {
     return null
   }
 
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', userId)
-    .single()
-  
-  if (error) {
+  try {
+    const data = await queryOne<User>(
+      'SELECT * FROM users WHERE id = $1',
+      [userId]
+    )
+    
+    return data
+  } catch (error) {
     console.error('Error fetching user:', error)
     return null
   }
-  
-  return data
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('email', email)
-    .single()
-  
-  if (error) {
+  try {
+    const data = await queryOne<User>(
+      'SELECT * FROM users WHERE email = $1',
+      [email]
+    )
+    
+    return data
+  } catch (error) {
     console.error('Error fetching user by email:', error)
     return null
   }
-  
-  return data
 }
 
 export interface SignupInput {

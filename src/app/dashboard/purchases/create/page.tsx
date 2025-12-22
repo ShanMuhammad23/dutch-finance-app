@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-
-import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import { Card } from "@/components/card";
@@ -18,8 +17,10 @@ import { CreatePurchaseInput } from "@/lib/types";
 import {
   BadgeCheckIcon,
   FileTextIcon,
+  Loader2Icon,
   PlusIcon,
   UploadIcon,
+  XIcon,
 } from "lucide-react";
 
 const inventoryOptions = [
@@ -114,13 +115,15 @@ const Page = () => {
     paymentType: "cash" as PaymentType,
   });
   const [lines, setLines] = useState<LineItem[]>([createEmptyLine(1)]);
-  const [submissionError, setSubmissionError] = useState<string | null>(null);
-  const [submissionSuccess, setSubmissionSuccess] = useState<string | null>(
-    null,
-  );
   const [submissionIntent, setSubmissionIntent] = useState<"draft" | "approved">(
     "draft",
   );
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+  const [attachmentPath, setAttachmentPath] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputAnotherRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
 
@@ -131,11 +134,10 @@ const Page = () => {
         queryKey: ["purchases", variables.organization_id],
       });
 
-      setSubmissionError(null);
-      setSubmissionSuccess(
+      toast.success(
         variables.status === "approved"
-          ? "Purchase approved successfully."
-          : "Purchase saved as draft.",
+          ? "Purchase approved successfully"
+          : "Purchase saved as draft",
       );
 
       setLines([createEmptyLine(1)]);
@@ -150,13 +152,16 @@ const Page = () => {
         vatAmount: "0,00",
       }));
       setSubmissionIntent("draft");
+      setAttachmentFile(null);
+      setAttachmentPreview(null);
+      setAttachmentPath(null);
     },
     onError: (error) => {
-      if (error instanceof Error) {
-        setSubmissionError(error.message);
-        return;
-      }
-      setSubmissionError("Unexpected error occurred");
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred. Please try again.";
+      toast.error(errorMessage);
     },
   });
 
@@ -247,54 +252,122 @@ const Page = () => {
     );
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSubmissionError(null);
-    setSubmissionSuccess(null);
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-    if (!organizationIdAsNumber) {
-      setSubmissionError("Select an organization before creating a purchase.");
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Invalid file type. Only images (JPG, PNG, GIF, WEBP) are allowed.");
       return;
     }
 
-    const payload: CreatePurchaseInput = {
-      organization_id: organizationIdAsNumber,
-      supplier_name: formState.supplierName,
-      payment_type: formState.paymentType,
-      attachment_date: formState.attachmentDate,
-      inventory_category:
-        formState.inventory === "none" ? null : formState.inventory,
-      account_code:
-        formState.account === "custom" ? null : formState.account || null,
-      amount_incl_vat: totals.total,
-      vat_amount: totals.vat,
-      subtotal: totals.subtotal,
-      total_amount: totals.total,
-      description: formState.description,
-      status: submissionIntent,
-      lines: lines.map((line) => ({
-        line_no: line.lineNo,
-        description: line.description,
-        amount_incl_vat: parseCurrency(line.amountInclVat),
-        vat_amount: parseCurrency(line.vatAmount),
-        account_code:
-          line.accountCode === "custom" ? null : line.accountCode || null,
-        inventory_category:
-          line.inventoryCategory === "none"
-            ? null
-            : line.inventoryCategory || null,
-      })),
+    // Validate file size (20 MB max)
+    const maxSize = 20 * 1024 * 1024; // 20 MB
+    if (file.size > maxSize) {
+      toast.error("File size exceeds 20 MB limit.");
+      return;
+    }
+
+    setAttachmentFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAttachmentPreview(reader.result as string);
     };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveAttachment = () => {
+    setAttachmentFile(null);
+    setAttachmentPreview(null);
+    setAttachmentPath(null);
+  };
+
+  const uploadAttachment = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/purchases/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || "Failed to upload attachment");
+    }
+
+    const data = await response.json();
+    return data.filePath;
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!organizationIdAsNumber) {
+      toast.error("Please select an organization before creating a purchase");
+      return;
+    }
 
     try {
-      await createPurchaseMutation.mutateAsync(payload);
-      } catch (error) {
-        console.error("Failed to create purchase:", error);
-      if (error instanceof Error) {
-        setSubmissionError(error.message);
-      } else {
-        setSubmissionError("Unexpected error occurred");
+      // Upload attachment if a file is selected
+      let uploadedFilePath = attachmentPath;
+      if (attachmentFile && !attachmentPath) {
+        setIsUploading(true);
+        try {
+          uploadedFilePath = await uploadAttachment(attachmentFile);
+          setAttachmentPath(uploadedFilePath);
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+              : "Failed to upload attachment";
+          toast.error(errorMessage);
+          setIsUploading(false);
+          return;
+        } finally {
+          setIsUploading(false);
+        }
       }
+
+      const payload: CreatePurchaseInput = {
+        organization_id: organizationIdAsNumber,
+        supplier_name: formState.supplierName,
+        payment_type: formState.paymentType,
+        attachment_date: formState.attachmentDate,
+        inventory_category:
+          formState.inventory === "none" ? null : formState.inventory,
+        account_code:
+          formState.account === "custom" ? null : formState.account || null,
+        amount_incl_vat: totals.total,
+        vat_amount: totals.vat,
+        subtotal: totals.subtotal,
+        total_amount: totals.total,
+        description: formState.description,
+        status: submissionIntent,
+        attachment_file: uploadedFilePath,
+        attachment_name: attachmentFile?.name || null,
+        lines: lines.map((line) => ({
+          line_no: line.lineNo,
+          description: line.description,
+          amount_incl_vat: parseCurrency(line.amountInclVat),
+          vat_amount: parseCurrency(line.vatAmount),
+          account_code:
+            line.accountCode === "custom" ? null : line.accountCode || null,
+          inventory_category:
+            line.inventoryCategory === "none"
+              ? null
+              : line.inventoryCategory || null,
+        })),
+      };
+
+      await createPurchaseMutation.mutateAsync(payload);
+    } catch (error) {
+      // Error is already handled in onError callback
+      console.error("Failed to create purchase:", error);
     }
   };
 
@@ -342,31 +415,66 @@ const Page = () => {
           </header>
 
           <section className="grid gap-6">
-            <div className="rounded-xl border border-dashed border-gray-4 bg-gray-2/60 px-6 py-8 text-center dark:border-dark-3 dark:bg-dark-2/50">
-              <div className="mx-auto flex size-16 items-center justify-center rounded-full border border-stroke bg-white dark:border-dark-3 dark:bg-gray-dark">
-                <UploadIcon className="size-6 text-primary" />
+            {!attachmentPreview ? (
+              <div className="rounded-xl border border-dashed border-gray-4 bg-gray-2/60 px-6 py-8 text-center dark:border-dark-3 dark:bg-dark-2/50">
+                <div className="mx-auto flex size-16 items-center justify-center rounded-full border border-stroke bg-white dark:border-dark-3 dark:bg-gray-dark">
+                  <UploadIcon className="size-6 text-primary" />
+                </div>
+                <div className="mt-4 space-y-1">
+                  <p className="font-medium text-dark dark:text-white">
+                    Attach file
+                  </p>
+                  <p className="text-body-sm text-gray-600 dark:text-gray-4">
+                    Upload a new voucher. JPG, PNG, GIF, WEBP up to 20 MB.
+                  </p>
+                </div>
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                  <Button
+                    label="Upload file"
+                    size="small"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
+                </div>
               </div>
-              <div className="mt-4 space-y-1">
-                <p className="font-medium text-dark dark:text-white">
-                  Attach file
-                </p>
-                <p className="text-body-sm text-gray-600 dark:text-gray-4">
-                  Select from document archive or upload a new voucher. PDF, JPG,
-                  PNG up to 20 MB.
-                </p>
+            ) : (
+              <div className="rounded-xl border border-stroke bg-white p-6 dark:border-dark-3 dark:bg-gray-dark">
+                <div className="flex items-start gap-4">
+                  <div className="relative flex-shrink-0">
+                    <img
+                      src={attachmentPreview}
+                      alt="Attachment preview"
+                      className="h-24 w-24 rounded-lg object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-dark dark:text-white truncate">
+                      {attachmentFile?.name}
+                    </p>
+                    <p className="text-body-sm text-gray-600 dark:text-gray-4 mt-1">
+                      {attachmentFile
+                        ? `${(attachmentFile.size / 1024 / 1024).toFixed(2)} MB`
+                        : ""}
+                    </p>
+                  </div>
+                  <Button
+                    label="Remove"
+                    variant="outlineDark"
+                    size="small"
+                    type="button"
+                    icon={<XIcon className="size-4" />}
+                    onClick={handleRemoveAttachment}
+                  />
+                </div>
               </div>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                <Button label="Upload file" size="small" type="button" />
-                <Button
-                  label="Select from archive"
-                  variant="outlineDark"
-                  size="small"
-                  type="button"
-                />
-              </div>
-            </div>
-
-      
+            )}
           </section>
 
           <section className="space-y-4">
@@ -573,35 +681,33 @@ const Page = () => {
 
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button
-                label="Save draft"
+                label={isPending || isUploading ? "Saving..." : "Save draft"}
                 variant="outlineDark"
                 size="small"
                 type="submit"
-                icon={<FileTextIcon className="size-4" />}
-                disabled={isPending || !canSubmit}
+                icon={
+                  isPending || isUploading ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <FileTextIcon className="size-4" />
+                  )
+                }
+                disabled={isPending || isUploading || !canSubmit}
                 onClick={() => setSubmissionIntent("draft")}
               />
               <Button
-                label="Approve"
+                label={isPending || isUploading ? "Approving..." : "Approve"}
                 size="small"
                 type="submit"
-                disabled={isPending || !canSubmit}
+                icon={
+                  isPending || isUploading ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : undefined
+                }
+                disabled={isPending || isUploading || !canSubmit}
                 onClick={() => setSubmissionIntent("approved")}
               />
             </div>
-
-            {(submissionError || submissionSuccess) && (
-              <p
-                className={cn(
-                  "text-sm font-medium",
-                  submissionError
-                    ? "text-red-500"
-                    : "text-green-600 dark:text-green-400",
-                )}
-              >
-                {submissionError ?? submissionSuccess}
-              </p>
-            )}
           </section>
         </Card>
 
@@ -622,6 +728,14 @@ const Page = () => {
               size="small"
               icon={<UploadIcon className="size-4" />}
               type="button"
+              onClick={() => fileInputAnotherRef.current?.click()}
+            />
+            <input
+              ref={fileInputAnotherRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+              className="hidden"
+              onChange={handleFileSelect}
             />
           </Card>
         </div>

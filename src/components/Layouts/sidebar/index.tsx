@@ -24,6 +24,7 @@ import {
   Building2,
   User2,
   LogOut,
+  FileText,
 } from "lucide-react";
 
 type NavigationItem = {
@@ -73,6 +74,11 @@ const navigationData: NavigationItem[] = [
     title: "Purchases",
     url: "/dashboard/purchases",
     icon: Puzzle,
+  },
+  {
+    title: "Activity Log",
+    url: "/dashboard/activity-logs",
+    icon: FileText,
   },
 ];
 

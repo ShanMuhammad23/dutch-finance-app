@@ -23,6 +23,8 @@ export interface Organization {
   status: string
   subscription_plan: string
   data_processing_agreement: boolean
+  // Optional logo filename or path stored in the database
+  logo?: string | null
   created_at: string
   updated_at: string
 }

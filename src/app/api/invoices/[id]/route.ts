@@ -1,26 +1,64 @@
 import { NextResponse } from 'next/server'
+import { queryOne } from '@/lib/db'
 import { Invoice } from '@/lib/types'
-
-// Mock data - in a real app, this would connect to your database
-const mockInvoices: Invoice[] = []
 
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params
-  const invoiceId = parseInt(id)
+  try {
+    const { id } = await context.params
+    const invoiceId = parseInt(id)
 
-  const invoice = mockInvoices.find(inv => inv.id === invoiceId)
+    if (Number.isNaN(invoiceId)) {
+      return NextResponse.json(
+        { error: 'Invalid invoice ID' },
+        { status: 400 }
+      )
+    }
 
-  if (!invoice) {
+    const data = await queryOne<any>(
+      `SELECT 
+        i.*,
+        json_build_object(
+          'id', c.id,
+          'name', c.name,
+          'email', c.email,
+          'phone', c.phone,
+          'contact_type', c.contact_type,
+          'address_line', c.address_line,
+          'postal_code', c.postal_code,
+          'city', c.city,
+          'country', c.country,
+          'vat_number', c.vat_number
+        ) as contact
+      FROM invoices i
+      LEFT JOIN contacts c ON i.contact_id = c.id
+      WHERE i.id = $1`,
+      [invoiceId]
+    )
+
+    if (!data) {
+      return NextResponse.json(
+        { error: 'Invoice not found' },
+        { status: 404 }
+      )
+    }
+
+    // Transform the response to match the expected Invoice type structure
+    const transformedData: any = {
+      ...data,
+      contact: data.contact || null,
+    }
+
+    return NextResponse.json(transformedData as Invoice)
+  } catch (error) {
+    console.error('Error in GET /api/invoices/[id]:', error)
     return NextResponse.json(
-      { error: 'Invoice not found' },
-      { status: 404 }
+      { error: 'Internal server error' },
+      { status: 500 }
     )
   }
-
-  return NextResponse.json(invoice)
 }
 
 export async function PUT(
