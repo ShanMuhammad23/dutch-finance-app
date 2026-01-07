@@ -455,7 +455,7 @@ export function ContactsView({ className }: ContactsViewProps) {
           <DialogHeader>
             <DialogTitle>Delete Contact</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{contactToDelete?.name}"? This
+              Are you sure you want to delete &quot;{contactToDelete?.name}&quot;? This
               action cannot be undone.
             </DialogDescription>
           </DialogHeader>

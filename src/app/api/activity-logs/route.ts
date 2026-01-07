@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
-import { auth } from '../auth/[...nextauth]/route'
+import { auth } from '@/lib/auth-config'
 
 // GET - Fetch activity logs with filtering
 export async function GET(request: NextRequest) {

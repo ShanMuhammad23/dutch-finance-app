@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
-import { auth } from '@/app/api/auth/[...nextauth]/route'
+import { auth } from '@/lib/auth-config'
 
 export async function GET(request: NextRequest) {
   try {

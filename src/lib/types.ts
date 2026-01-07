@@ -81,6 +81,7 @@ export interface Invoice {
   created_at: string;
   updated_at: string;
   is_published?: boolean;
+  payment_link?: string | null;
   // Relations
   contact?: Contact;
   items?: InvoiceItem[];

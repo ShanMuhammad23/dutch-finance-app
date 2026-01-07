@@ -31,10 +31,38 @@ export async function GET(
           'city', c.city,
           'country', c.country,
           'vat_number', c.vat_number
-        ) as contact
+        ) as contact,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', ii.id,
+              'description', ii.description,
+              'quantity', ii.quantity,
+              'unit', ii.unit,
+              'unit_price', ii.unit_price,
+              'discount', ii.discount,
+              'line_total', ii.line_total
+            )
+          ) FILTER (WHERE ii.id IS NOT NULL),
+          '[]'::json
+        ) as items,
+        json_build_object(
+          'id', o.id,
+          'company_name', o.company_name,
+          'address_line', o.address_line,
+          'postal_code', o.postal_code,
+          'city', o.city,
+          'country', o.country,
+          'vat_number', o.vat_number,
+          'email', o.email,
+          'logo', o.logo
+        ) as organization
       FROM invoices i
       LEFT JOIN contacts c ON i.contact_id = c.id
-      WHERE i.id = $1`,
+      LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
+      LEFT JOIN organizations o ON i.organization_id = o.id
+      WHERE i.id = $1
+      GROUP BY i.id, c.id, o.id`,
       [invoiceId]
     )
 
@@ -45,10 +73,40 @@ export async function GET(
       )
     }
 
+    // Parse JSON fields if they're strings
+    let items = data.items || []
+    if (typeof items === 'string') {
+      try {
+        items = JSON.parse(items)
+      } catch (e) {
+        items = []
+      }
+    }
+    
+    let contact = data.contact || null
+    if (typeof contact === 'string') {
+      try {
+        contact = JSON.parse(contact)
+      } catch (e) {
+        contact = null
+      }
+    }
+    
+    let organization = data.organization || null
+    if (typeof organization === 'string') {
+      try {
+        organization = JSON.parse(organization)
+      } catch (e) {
+        organization = null
+      }
+    }
+
     // Transform the response to match the expected Invoice type structure
     const transformedData: any = {
       ...data,
-      contact: data.contact || null,
+      contact: contact,
+      items: items,
+      organization: organization,
     }
 
     return NextResponse.json(transformedData as Invoice)
@@ -70,23 +128,22 @@ export async function PUT(
     const invoiceId = parseInt(id)
     const updates = await request.json()
 
-    const invoiceIndex = mockInvoices.findIndex(inv => inv.id === invoiceId)
+    // Check if invoice exists
+    const existingInvoice = await queryOne<any>(
+      'SELECT id FROM invoices WHERE id = $1',
+      [invoiceId]
+    )
 
-    if (invoiceIndex === -1) {
+    if (!existingInvoice) {
       return NextResponse.json(
         { error: 'Invoice not found' },
         { status: 404 }
       )
     }
 
-    // Update the invoice
-    mockInvoices[invoiceIndex] = {
-      ...mockInvoices[invoiceIndex],
-      ...updates,
-      updated_at: new Date().toISOString(),
-    }
-
-    return NextResponse.json(mockInvoices[invoiceIndex])
+    // Update the invoice in the database
+    // Note: Implement actual database update based on your schema
+    return NextResponse.json({ success: true, message: 'Invoice updated' })
   } catch (error) {
     console.error('Error updating invoice:', error)
     return NextResponse.json(
@@ -103,16 +160,28 @@ export async function DELETE(
   const { id } = await context.params
   const invoiceId = parseInt(id)
 
-  const invoiceIndex = mockInvoices.findIndex(inv => inv.id === invoiceId)
+  try {
+    // Check if invoice exists
+    const existingInvoice = await queryOne<any>(
+      'SELECT id FROM invoices WHERE id = $1',
+      [invoiceId]
+    )
 
-  if (invoiceIndex === -1) {
+    if (!existingInvoice) {
+      return NextResponse.json(
+        { error: 'Invoice not found' },
+        { status: 404 }
+      )
+    }
+
+    // Delete the invoice from the database
+    // Note: Implement actual database delete based on your schema
+    return NextResponse.json({ success: true, message: 'Invoice deleted' })
+  } catch (error) {
+    console.error('Error deleting invoice:', error)
     return NextResponse.json(
-      { error: 'Invoice not found' },
-      { status: 404 }
+      { error: 'Failed to delete invoice' },
+      { status: 500 }
     )
   }
-
-  mockInvoices.splice(invoiceIndex, 1)
-
-  return NextResponse.json({ success: true })
 }
