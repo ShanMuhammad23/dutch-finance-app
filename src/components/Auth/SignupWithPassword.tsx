@@ -97,12 +97,17 @@ export default function SignupWithPassword() {
       setError("Password must be at least 8 characters long");
       return false;
     }
+    // New validation for at least one number
+    if (!/\d/.test(userData.password)) {
+      setError("Password must contain at least one number");
+      return false;
+    }
     if (userData.password !== userData.confirmPassword) {
       setError("Passwords do not match");
       return false;
     }
     return true;
-  };
+};
 
   const validateOrganizationData = (): boolean => {
     if (!organizationData.business_type) {
