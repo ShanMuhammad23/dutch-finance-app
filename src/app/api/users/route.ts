@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, queryOne } from '@/lib/db'
 import { hashPassword, validatePasswordStrength } from '@/lib/auth'
-import { auth } from '../auth/[...nextauth]/route'
+import { auth } from '@/lib/auth-config'
 import { logActivityFromRequest } from '@/lib/activity-log'
 
 // GET - Fetch all users

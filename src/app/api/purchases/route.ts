@@ -80,10 +80,12 @@ export async function GET(request: NextRequest) {
     if (linesData) {
       linesData.forEach((line) => {
         const purchaseId = line.purchase_id;
-        if (!linesByPurchaseId.has(purchaseId)) {
-          linesByPurchaseId.set(purchaseId, []);
+        if (purchaseId !== undefined && purchaseId !== null) {
+          if (!linesByPurchaseId.has(purchaseId)) {
+            linesByPurchaseId.set(purchaseId, []);
+          }
+          linesByPurchaseId.get(purchaseId)!.push(line as PurchaseLine);
         }
-        linesByPurchaseId.get(purchaseId)!.push(line as PurchaseLine);
       });
     }
 

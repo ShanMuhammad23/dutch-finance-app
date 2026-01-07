@@ -1,23 +1,20 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import SigninWithPassword from "@/components/Auth/SigninWithPassword";
+import SignupWithPassword from "@/components/Auth/SignupWithPassword";
 
 export const metadata: Metadata = {
-  title: "Sign in",
+  title: "Sign up",
 };
 
-export const dynamic = "force-dynamic";
-
-export default function SignIn() {
+export default function SignUp() {
   return (
     <>
-
       <div className="rounded-[10px] bg-white shadow-1 dark:bg-gray-dark dark:shadow-card">
         <div className="flex flex-wrap items-center">
           <div className="w-full xl:w-1/2">
             <div className="w-full p-4 sm:p-12.5 xl:p-15">
-              <SigninWithPassword />
+              <SignupWithPassword />
             </div>
           </div>
 
@@ -40,16 +37,15 @@ export default function SignIn() {
                 />
               </Link>
               <p className="mb-3 text-xl font-medium text-dark dark:text-white">
-                Sign in to your account
+                Create your account
               </p>
 
               <h1 className="mb-4 text-2xl font-bold text-dark dark:text-white sm:text-heading-3">
-                Welcome Back!
+                Get Started Today!
               </h1>
 
               <p className="w-full max-w-[375px] font-medium text-dark-4 dark:text-dark-6">
-                Please sign in to your account by completing the necessary
-                fields below
+                Sign up to create your account and organization. You&apos;ll be able to manage your finances, invoices, and more.
               </p>
 
               <div className="mt-31">
@@ -68,3 +64,4 @@ export default function SignIn() {
     </>
   );
 }
+

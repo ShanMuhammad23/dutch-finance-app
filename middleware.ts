@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-import { withAuth } from "next-auth/middleware";
+import { auth } from "@/lib/auth-config";
 
 const PUBLIC_ROUTES = [
   "/auth/sign-in",
@@ -9,37 +8,32 @@ const PUBLIC_ROUTES = [
 
 const ADMIN_PREFIX = "/admin";
 
-export default withAuth(
-  (req) => {
-    const { token } = req.nextauth;
-    const { pathname } = req.nextUrl;
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
 
-    if (pathname.startsWith(ADMIN_PREFIX) && token?.role !== "admin") {
-      const signInUrl = new URL("/auth/sign-in", req.url);
-      signInUrl.searchParams.set("callbackUrl", pathname);
-      return NextResponse.redirect(signInUrl);
-    }
+  // Allow public routes
+  if (
+    PUBLIC_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`),
+    )
+  ) {
+    return;
+  }
 
-    return NextResponse.next();
-  },
-  {
-    callbacks: {
-      authorized: ({ req, token }) => {
-        const { pathname } = req.nextUrl;
+  // Check if user is authenticated
+  if (!req.auth) {
+    const signInUrl = new URL("/auth/sign-in", req.url);
+    signInUrl.searchParams.set("callbackUrl", pathname);
+    return Response.redirect(signInUrl);
+  }
 
-        if (
-          PUBLIC_ROUTES.some(
-            (route) => pathname === route || pathname.startsWith(`${route}/`),
-          )
-        ) {
-          return true;
-        }
-
-        return Boolean(token);
-      },
-    },
-  },
-);
+  // Check admin routes
+  if (pathname.startsWith(ADMIN_PREFIX) && req.auth.user?.role !== "admin") {
+    const signInUrl = new URL("/auth/sign-in", req.url);
+    signInUrl.searchParams.set("callbackUrl", pathname);
+    return Response.redirect(signInUrl);
+  }
+});
 
 export const config = {
   matcher: [

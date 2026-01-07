@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
-import { auth } from '../../auth/[...nextauth]/route'
+import { auth } from '@/lib/auth-config'
 import { logActivityFromRequest } from '@/lib/activity-log'
 
 // Helper to ensure only privileged roles can manage users
@@ -26,13 +26,14 @@ async function requireAdmin() {
 // PATCH - Update user (name, email, role)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const guard = await requireAdmin()
     if ('errorResponse' in guard) return guard.errorResponse
 
-    const id = Number(params.id)
+    const { id: paramId } = await params
+    const id = Number(paramId)
     if (!id || Number.isNaN(id)) {
       return NextResponse.json({ error: 'Invalid user id' }, { status: 400 })
     }
@@ -139,13 +140,14 @@ export async function PATCH(
 // DELETE - Remove user
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const guard = await requireAdmin()
     if ('errorResponse' in guard) return guard.errorResponse
 
-    const id = Number(params.id)
+    const { id: paramId } = await params
+    const id = Number(paramId)
     if (!id || Number.isNaN(id)) {
       return NextResponse.json({ error: 'Invalid user id' }, { status: 400 })
     }
