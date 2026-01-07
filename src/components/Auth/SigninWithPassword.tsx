@@ -85,6 +85,7 @@ export default function SigninWithPassword() {
       const credentials: any = {
         email: data.email,
         password: data.password,
+        remember: data.remember.toString(),
         callbackUrl,
       };
       
@@ -158,7 +159,7 @@ export default function SigninWithPassword() {
 
       // Success case
       if (result?.ok) {
-        router.replace(result.url || "/dashboard");
+        router.replace("/dashboard");
         router.refresh();
       }
     } catch (err: any) {

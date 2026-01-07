@@ -1,5 +1,6 @@
 "use client";
 import { EmailIcon, PasswordIcon } from "@/assets/icons";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import React, { useState } from "react";

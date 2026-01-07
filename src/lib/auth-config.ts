@@ -20,12 +20,14 @@ declare module "next-auth" {
   
   interface User {
     role: string
+    remember?: boolean
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
     role: string
+    remember?: boolean
   }
 }
 
@@ -36,7 +38,8 @@ export const authOptions: NextAuthConfig = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
-        otp: { label: "OTP", type: "text" }
+        otp: { label: "OTP", type: "text" },
+        remember: { label: "Remember", type: "text" }
       },
       async authorize(credentials) {
         console.log('🔐 Auth attempt:', { email: credentials?.email, passwordLength: (credentials?.password as string)?.length })
@@ -56,6 +59,8 @@ export const authOptions: NextAuthConfig = {
             console.log('❌ User not found')
             return null
           }
+
+          const remember = credentials.remember === 'true'
 
           console.log('👤 User found:', { id: userProfile.id, email: userProfile.email })
           console.log('🔑 Stored password format:', userProfile.password.startsWith('$2b$') ? 'Hashed (bcrypt)' : 'Plain text')
@@ -228,6 +233,7 @@ If you didn't request this code, please ignore this email or contact support if 
             email: userProfile.email,
             name: userProfile.full_name,
             role: userProfile.role,
+            remember: remember,
             // organizationId will be fetched separately if needed
           }
         } catch (error: any) {
@@ -251,6 +257,12 @@ If you didn't request this code, please ignore this email or contact support if 
     async jwt({ token, user }: { token: JWT; user: User | undefined }) {
       if (user) {
         token.role = user.role
+        token.remember = user.remember
+        if (user.remember) {
+          token.exp = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30 days
+        } else {
+          token.exp = Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 1 day
+        }
       }
       return token
     },
