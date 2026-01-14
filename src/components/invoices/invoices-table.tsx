@@ -421,23 +421,31 @@ export function InvoicesTable({ organizationId }: InvoicesTableProps) {
               </td>
                         <td className="px-4 py-4 text-sm whitespace-nowrap">
                           <div className="flex items-center gap-x-6">
-                  <button
+                            <button
+                              onClick={() => window.open(`/dashboard/invoices/${invoice.id}/view`, '_blank')}
+                              className="text-blue-500 transition-colors duration-200 hover:text-indigo-500 focus:outline-none flex items-center gap-1"
+                              title="View Invoice"
+                            >
+                              <Eye className="w-4 h-4" />
+                              View
+                            </button>
+                            <button
                               onClick={() => handleArchive(invoice.id)}
                               className="text-gray-500 transition-colors duration-200 dark:hover:text-indigo-500 dark:text-gray-300 hover:text-indigo-500 focus:outline-none"
                             >
                               Archive
-                  </button>
-                  <button
-                    onClick={() => {
+                            </button>
+                            <button
+                              onClick={() => {
                                 // TODO: Implement download for specific invoice
                                 toast.info(`Download invoice #${invoice.invoice_number}`)
-                    }}
+                              }}
                               className="text-blue-500 transition-colors duration-200 hover:text-indigo-500 focus:outline-none"
-                  >
+                            >
                               Download
-                  </button>
-                </div>
-              </td>
+                            </button>
+                          </div>
+                        </td>
             </tr>
                     )
                   })}

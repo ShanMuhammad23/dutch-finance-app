@@ -43,19 +43,57 @@ export async function GET(request: NextRequest) {
           'city', c.city,
           'country', c.country,
           'vat_number', c.vat_number
-        ) as contact
+        ) as contact,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', ii.id,
+              'description', ii.description,
+              'quantity', ii.quantity,
+              'unit', ii.unit,
+              'unit_price', ii.unit_price,
+              'discount', ii.discount,
+              'line_total', ii.line_total
+            )
+          ) FILTER (WHERE ii.id IS NOT NULL),
+          '[]'::json
+        ) as items
       FROM invoices i
       LEFT JOIN contacts c ON i.contact_id = c.id
+      LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
       WHERE i.organization_id = $1
+      GROUP BY i.id, c.id
       ORDER BY i.created_at DESC`,
       [parsedId]
     )
 
     // Transform the response to match the expected Invoice type structure
-    const transformedData = data.map((invoice: any) => ({
-      ...invoice,
-      contact: invoice.contact || null,
-    }))
+    const transformedData = data.map((invoice: any) => {
+      // Parse JSON fields if they're strings
+      let items = invoice.items || []
+      if (typeof items === 'string') {
+        try {
+          items = JSON.parse(items)
+        } catch (e) {
+          items = []
+        }
+      }
+      
+      let contact = invoice.contact || null
+      if (typeof contact === 'string') {
+        try {
+          contact = JSON.parse(contact)
+        } catch (e) {
+          contact = null
+        }
+      }
+      
+      return {
+        ...invoice,
+        contact: contact,
+        items: items,
+      }
+    })
 
     // Log activity
     const session = await auth();
@@ -183,6 +221,7 @@ export async function POST(request: NextRequest) {
       line_total: calculateLineTotal(item.quantity, item.unit_price, item.discount ?? 0),
     }))
 
+<<<<<<< HEAD
     // Log activity
     const session = await auth();
     if (session?.user) {
@@ -204,6 +243,39 @@ export async function POST(request: NextRequest) {
           session,
         }
       );
+=======
+    // Insert invoice items (line_total is a generated column, so we don't insert it)
+    for (const item of itemsWithTotals) {
+      await queryOne(
+        `INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, discount)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [item.invoice_id, item.description, item.quantity, item.unit, item.unit_price, item.discount]
+      )
+    }
+
+    // If status is 'sent' and contact has email, send email automatically
+    if (status === 'sent' && body.contact_id) {
+      try {
+        const contact = await queryOne<any>(
+          'SELECT email FROM contacts WHERE id = $1',
+          [body.contact_id]
+        )
+        
+        if (contact?.email) {
+          // Trigger email sending in background (don't wait for it)
+          fetch(`${request.nextUrl.origin}/api/invoices/${data.id}/send-email`, {
+            method: 'POST',
+          }).catch(err => {
+            console.error('Failed to send invoice email:', err)
+            // Don't fail the request if email fails
+          })
+        }
+      } catch (emailError) {
+        console.error('Error sending invoice email:', emailError)
+        // Don't fail the request if email fails
+      }
+>>>>>>> d81abe5a6f50e02670cc1058d2aa04a61e0ed1ac
     }
 
     return NextResponse.json(

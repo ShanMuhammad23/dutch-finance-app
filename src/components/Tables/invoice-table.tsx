@@ -14,6 +14,8 @@ import { useOrganizationInvoices } from "@/lib/queries/invoices";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui-elements/button";
 import dayjs from "dayjs";
+import Link from "next/link";
+import { Eye } from "lucide-react";
 
 function formatCurrency(value: number, currency?: string) {
   try {
@@ -164,6 +166,7 @@ export function InvoiceTable() {
             <TableHead>Customer</TableHead>
             <TableHead>Total</TableHead>
             <TableHead>Late Fee</TableHead>
+            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
 
@@ -172,7 +175,7 @@ export function InvoiceTable() {
 
           {!showSkeleton && isError && (
             <TableRow className="border-[#eee] dark:border-dark-3">
-              <TableCell colSpan={8} className="py-10 text-center">
+              <TableCell colSpan={9} className="py-10 text-center">
                 <div className="mx-auto flex max-w-md flex-col items-center gap-3 text-sm text-slate-600 dark:text-white/70">
                   <p>We couldn&apos;t load the invoices for this organization.</p>
                   {error instanceof Error && (
@@ -191,7 +194,7 @@ export function InvoiceTable() {
 
           {!showSkeleton && !isError && invoices.length === 0 && (
             <TableRow className="border-[#eee] dark:border-dark-3">
-              <TableCell colSpan={8} className="py-12 text-center">
+              <TableCell colSpan={9} className="py-12 text-center">
                 <div className="mx-auto max-w-lg space-y-2 text-sm text-slate-600 dark:text-white/70">
                   <p className="font-medium text-dark dark:text-white">
                     No invoices found
@@ -270,6 +273,17 @@ export function InvoiceTable() {
 
                   <TableCell className="xl:pr-7.5">
                     <p className="mt-[3px] text-body-sm font-medium">{formattedLateFee}</p>
+                  </TableCell>
+
+                  <TableCell className="xl:pr-7.5">
+                    <Link
+                      href={`/dashboard/invoices/${invoice.id}/view`}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                      title="View Invoice"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>View</span>
+                    </Link>
                   </TableCell>
                 </TableRow>
               );

@@ -22,6 +22,15 @@ export default function SigninWithPassword() {
   const [showOTP, setShowOTP] = useState(false);
   const [sendingOTP, setSendingOTP] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
+
+  useEffect(() => {
+    if (searchParams?.get("signup") === "success") {
+      setSignupSuccess(true);
+      // Clear the query parameter from URL
+      router.replace("/auth/sign-in", { scroll: false });
+    }
+  }, [searchParams, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setData({
@@ -76,6 +85,7 @@ export default function SigninWithPassword() {
       const credentials: any = {
         email: data.email,
         password: data.password,
+        remember: data.remember.toString(),
         callbackUrl,
       };
       
@@ -93,18 +103,17 @@ export default function SigninWithPassword() {
       const result = await signIn("credentials", {
         redirect: false,
         ...credentials,
-      });
+      }) as any;
 
-      if (!result) {
-        setError("Unable to connect to the server. Please try again.");
-        return;
-      }
-
-      if (result.error) {
+      if (!result || result.error) {
+        const errorMsg = result?.error || "Unable to connect to the server. Please try again.";
+        setError(errorMsg);
+        
         // Check if OTP is required - NextAuth passes error message through
-        const errorMsg = result.error.toString().toUpperCase();
-        const errorString = result.error.toString();
-        console.log('🔍 Login error:', { error: result.error, errorString, errorMsg });
+        const errorString = errorMsg.toString().toUpperCase();
+
+        console.log('🔍 Login error:', { error: result?.error, errorString, errorMsg });
+
         
         // Check for OTP-related errors - be more explicit
         const isOTPRequired = errorMsg.includes("OTP_REQUIRED");
@@ -148,8 +157,9 @@ export default function SigninWithPassword() {
         return;
       }
 
-      if (result.url) {
-        router.replace(result.url);
+      // Success case
+      if (result?.ok) {
+        router.replace("/dashboard");
         router.refresh();
       }
     } catch (err: any) {
@@ -218,8 +228,6 @@ export default function SigninWithPassword() {
             handleChange={handleChange}
             value={data.otp}
             required
-            maxLength={6}
-            pattern="[0-9]{6}"
           />
           <div className="mt-2 flex items-center justify-between">
             <button
@@ -244,6 +252,12 @@ export default function SigninWithPassword() {
             </button>
           </div>
         </div>
+      )}
+
+      {signupSuccess && (
+        <p className="mb-4 rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-600 dark:border-green-600/40 dark:bg-green-900/20 dark:text-green-200">
+          Account created successfully! Please sign in to continue.
+        </p>
       )}
 
       {error && (
@@ -289,6 +303,16 @@ export default function SigninWithPassword() {
           )}
         </button>
       </div>
+
+      <p className="text-center text-body-sm text-dark-6 dark:text-dark-6">
+        Don&apos;t have an account?{" "}
+        <Link
+          href="/auth/sign-up"
+          className="text-primary hover:underline"
+        >
+          Sign up
+        </Link>
+      </p>
     </form>
   );
 }

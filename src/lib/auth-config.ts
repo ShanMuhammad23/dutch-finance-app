@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import NextAuth, { type NextAuthConfig } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { queryOne } from "@/lib/db"
@@ -7,7 +6,6 @@ import { sql } from "@/lib/db"
 import { sendHtmlEmail } from "@/lib/email"
 import type { JWT } from "next-auth/jwt"
 import type { Session, User } from "next-auth"
-import { logActivity } from "@/lib/activity-log"
 
 // Extend NextAuth types
 declare module "next-auth" {
@@ -22,12 +20,14 @@ declare module "next-auth" {
   
   interface User {
     role: string
+    remember?: boolean
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
     role: string
+    remember?: boolean
   }
 }
 
@@ -38,7 +38,8 @@ export const authOptions: NextAuthConfig = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
-        otp: { label: "OTP", type: "text" }
+        otp: { label: "OTP", type: "text" },
+        remember: { label: "Remember", type: "text" }
       },
       async authorize(credentials) {
         console.log('🔐 Auth attempt:', { email: credentials?.email, passwordLength: (credentials?.password as string)?.length })
@@ -58,6 +59,8 @@ export const authOptions: NextAuthConfig = {
             console.log('❌ User not found')
             return null
           }
+
+          const remember = credentials.remember === 'true'
 
           console.log('👤 User found:', { id: userProfile.id, email: userProfile.email })
           console.log('🔑 Stored password format:', userProfile.password.startsWith('$2b$') ? 'Hashed (bcrypt)' : 'Plain text')
@@ -225,33 +228,12 @@ If you didn't request this code, please ignore this email or contact support if 
           }
 
           console.log('✅ Password valid, creating session')
-          
-          // Log login activity
-          try {
-            await logActivity({
-              action: 'LOGIN',
-              entity_type: 'auth',
-              entity_id: null,
-              user_id: userProfile.id,
-              description: `User logged in: ${userProfile.full_name} (${userProfile.email})`,
-              details: {
-                user_id: userProfile.id,
-                email: userProfile.email,
-                role: userProfile.role,
-              },
-              ip_address: null, // Request not available in authorize function
-              user_agent: null,
-            })
-          } catch (error) {
-            // Don't fail login if logging fails
-            console.error('Failed to log login activity:', error)
-          }
-          
           return {
             id: userProfile.id.toString(),
             email: userProfile.email,
             name: userProfile.full_name,
             role: userProfile.role,
+            remember: remember,
             // organizationId will be fetched separately if needed
           }
         } catch (error: any) {
@@ -275,6 +257,12 @@ If you didn't request this code, please ignore this email or contact support if 
     async jwt({ token, user }: { token: JWT; user: User | undefined }) {
       if (user) {
         token.role = user.role
+        token.remember = user.remember
+        if (user.remember) {
+          token.exp = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30 days
+        } else {
+          token.exp = Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 1 day
+        }
       }
       return token
     },
@@ -296,8 +284,6 @@ If you didn't request this code, please ignore this email or contact support if 
 }
 
 const { handlers, auth } = NextAuth(authOptions)
-=======
-import { handlers } from "@/lib/auth-config"
->>>>>>> d81abe5a6f50e02670cc1058d2aa04a61e0ed1ac
 
-export const { GET, POST } = handlers
+export { handlers, auth }
+
