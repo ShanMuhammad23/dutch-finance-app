@@ -1,12 +1,11 @@
-import { PaymentsOverview } from "@/components/Charts/payments-overview";
-import { WeeksProfit } from "@/components/Charts/weeks-profit";
+import { WeeksProfit } from "@/components/Charts/weeks-profit/client-wrapper";
 import { TopChannelsSkeleton } from "@/components/Tables/top-channels/skeleton";
 import { createTimeFrameExtractor } from "@/utils/timeframe-extractor";
 import { Suspense } from "react";
-import { ChatsCard } from "./_components/chats-card";
-import { OverviewCardsGroup } from "./_components/overview-cards";
+import { OverviewCardsClientWrapper } from "./_components/overview-cards/client-wrapper";
 import { OverviewCardsSkeleton } from "./_components/overview-cards/skeleton";
 import { InvoiceTable } from "@/components/Tables/invoice-table";
+import { IncomeExpensesChart } from "@/components/Charts/income-expenses";
 
 type PropsType = {
   searchParams: Promise<{
@@ -21,14 +20,14 @@ export default async function Home({ searchParams }: PropsType) {
   return (
     <>
       <Suspense fallback={<OverviewCardsSkeleton />}>
-        <OverviewCardsGroup />
+        <OverviewCardsClientWrapper />
       </Suspense>
 
       <div className="mt-4 grid grid-cols-12 gap-4 md:mt-6 md:gap-6 2xl:mt-9 2xl:gap-7.5">
-        <PaymentsOverview
+        <IncomeExpensesChart
           className="col-span-12 xl:col-span-7"
-          key={extractTimeFrame("payments_overview")}
-          timeFrame={extractTimeFrame("payments_overview")?.split(":")[1]}
+          key={extractTimeFrame("income_expenses")}
+          timeFrame={extractTimeFrame("income_expenses")?.split(":")[1]}
         />
 
         <WeeksProfit
@@ -36,7 +35,6 @@ export default async function Home({ searchParams }: PropsType) {
           timeFrame={extractTimeFrame("weeks_profit")?.split(":")[1]}
           className="col-span-12 xl:col-span-5"
         />
-
 
         <div className="col-span-12">
           <Suspense fallback={<TopChannelsSkeleton />}>

@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { calculateInvoiceTotals, calculateLineTotal } from '@/lib/invoice-utils'
 import { queryMany, queryOne } from '@/lib/db'
 import { CreateInvoiceInput } from '@/lib/types'
+import { checkInvoiceLimit, getLimitErrorMessage } from '@/lib/plan-limits'
+import { countInvoicesThisMonth, getOrganizationPlan } from '@/lib/plan-utils'
+import { auth } from '../auth/[...nextauth]/route'
+import { logActivityFromRequest } from '@/lib/activity-log'
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,6 +57,22 @@ export async function GET(request: NextRequest) {
       contact: invoice.contact || null,
     }))
 
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'VIEW',
+        'invoice',
+        {
+          organization_id: parsedId,
+          description: `Viewed invoices list`,
+          details: { organization_id: parsedId, count: transformedData.length },
+          request,
+          session,
+        }
+      );
+    }
+
     return NextResponse.json(transformedData)
   } catch (error) {
     console.error('Error in GET /api/invoices:', error)
@@ -76,6 +96,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 },
+      )
+    }
+
+    // Check plan limits for invoice creation
+    const plan = await getOrganizationPlan(body.organization_id)
+    const currentInvoiceCount = await countInvoicesThisMonth(body.organization_id)
+    const limitCheck = checkInvoiceLimit(currentInvoiceCount, plan)
+
+    if (!limitCheck.allowed) {
+      return NextResponse.json(
+        { 
+          error: getLimitErrorMessage('invoices', plan, limitCheck.current, limitCheck.limit),
+          limitExceeded: true,
+          limitType: 'invoices',
+          current: limitCheck.current,
+          limit: limitCheck.limit,
+        },
+        { status: 403 },
       )
     }
 
@@ -144,6 +182,29 @@ export async function POST(request: NextRequest) {
       discount: item.discount ?? 0,
       line_total: calculateLineTotal(item.quantity, item.unit_price, item.discount ?? 0),
     }))
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'CREATE',
+        'invoice',
+        {
+          entity_id: data.id,
+          organization_id: data.organization_id,
+          description: `Created invoice #${data.invoice_number || data.id}`,
+          details: {
+            invoice_id: data.id,
+            invoice_number: data.invoice_number,
+            status: data.status,
+            total_amount: data.total_amount,
+            organization_id: data.organization_id,
+          },
+          request,
+          session,
+        }
+      );
+    }
 
     return NextResponse.json(
       {

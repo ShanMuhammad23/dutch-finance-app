@@ -5,8 +5,7 @@ import dynamic from "next/dynamic";
 
 type PropsType = {
   data: {
-    sales: { x: string; y: number }[];
-    revenue: { x: string; y: number }[];
+    profit: { x: string; y: number }[];
   };
 };
 
@@ -16,10 +15,9 @@ const Chart = dynamic(() => import("react-apexcharts"), {
 
 export function WeeksProfitChart({ data }: PropsType) {
   const options: ApexOptions = {
-    colors: ["#5750F1", "#0ABEF9"],
+    colors: ["#219653", "#D34053"], // Green for positive, Red for negative
     chart: {
       type: "bar",
-      stacked: true,
       toolbar: {
         show: false,
       },
@@ -45,9 +43,22 @@ export function WeeksProfitChart({ data }: PropsType) {
       bar: {
         horizontal: false,
         borderRadius: 3,
-        columnWidth: "25%",
+        columnWidth: "40%",
         borderRadiusApplication: "end",
-        borderRadiusWhenStacked: "last",
+        colors: {
+          ranges: [
+            {
+              from: -Infinity,
+              to: 0,
+              color: "#D34053", // Red for negative profit
+            },
+            {
+              from: 0,
+              to: Infinity,
+              color: "#219653", // Green for positive profit
+            },
+          ],
+        },
       },
     },
     dataLabels: {
@@ -77,18 +88,32 @@ export function WeeksProfitChart({ data }: PropsType) {
       },
     },
     legend: {
-      position: "top",
-      horizontalAlign: "left",
-      fontFamily: "inherit",
-      fontWeight: 500,
-      fontSize: "14px",
-      markers: {
-        size: 9,
-        shape: "circle",
-      },
+      show: false,
     },
     fill: {
       opacity: 1,
+    },
+    tooltip: {
+      y: {
+        formatter: (value: number) => {
+          return new Intl.NumberFormat('da-DK', {
+            style: 'currency',
+            currency: 'DKK',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          }).format(value)
+        },
+      },
+    },
+    yaxis: {
+      labels: {
+        formatter: (value: number) => {
+          return new Intl.NumberFormat('da-DK', {
+            notation: 'compact',
+            maximumFractionDigits: 1,
+          }).format(value)
+        },
+      },
     },
   };
   return (
@@ -97,12 +122,8 @@ export function WeeksProfitChart({ data }: PropsType) {
         options={options}
         series={[
           {
-            name: "Sales",
-            data: data.sales,
-          },
-          {
-            name: "Revenue",
-            data: data.revenue,
+            name: "Profit",
+            data: data.profit,
           },
         ]}
         type="bar"

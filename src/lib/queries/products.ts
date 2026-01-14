@@ -51,4 +51,35 @@ export async function createProduct(input: CreateProductInput): Promise<Product>
   return response.json();
 }
 
+export async function updateProduct(
+  id: number,
+  input: Partial<CreateProductInput>
+): Promise<Product> {
+  const response = await fetch(`/api/products/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || "Failed to update product");
+  }
+
+  return response.json();
+}
+
+export async function deleteProduct(id: number): Promise<void> {
+  const response = await fetch(`/api/products/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || "Failed to delete product");
+  }
+}
+
 

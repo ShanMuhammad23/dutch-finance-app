@@ -129,6 +129,54 @@ export interface UpdateContactInput {
   vat_number?: string;
 }
 
+// Bank Transaction Types
+export interface BankTransaction {
+  id?: number;
+  organization_id?: number;
+  transaction_date: string;
+  value_date?: string;
+  description: string;
+  amount: number; // Positive for credit, negative for debit
+  balance?: number;
+  reference?: string;
+  counterparty?: string;
+  account_number?: string;
+  currency?: string;
+  transaction_type?: 'debit' | 'credit';
+  category?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ParsedBankTransaction {
+  transaction_date: string;
+  value_date?: string;
+  description: string;
+  amount: number;
+  balance?: number;
+  reference?: string;
+  counterparty?: string;
+  account_number?: string;
+  currency?: string;
+  transaction_type?: 'debit' | 'credit';
+  errors?: string[];
+  warnings?: string[];
+}
+
+export interface BankStatementUpload {
+  filename: string;
+  uploaded_at: string;
+  transactions: ParsedBankTransaction[];
+  total_debits: number;
+  total_credits: number;
+  currency: string;
+  account_number?: string;
+  date_range: {
+    start: string;
+    end: string;
+  };
+}
+
 export interface PurchaseLine {
   id?: number;
   purchase_id?: number;

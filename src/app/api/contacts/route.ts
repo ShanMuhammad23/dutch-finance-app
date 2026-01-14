@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Contact, CreateContactInput } from '@/lib/types'
 import { queryMany, queryOne } from '@/lib/db'
+import { auth } from '../auth/[...nextauth]/route'
+import { logActivityFromRequest } from '@/lib/activity-log'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,6 +21,22 @@ export async function GET(request: NextRequest) {
       'SELECT * FROM contacts WHERE organization_id = $1 ORDER BY created_at DESC',
       [parseInt(organizationId)]
     )
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'VIEW',
+        'contact',
+        {
+          organization_id: parseInt(organizationId),
+          description: `Viewed contacts list`,
+          details: { organization_id: parseInt(organizationId), count: data.length },
+          request,
+          session,
+        }
+      );
+    }
 
     return NextResponse.json(data || [])
   } catch (error) {
@@ -67,6 +85,28 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create contact' },
         { status: 500 }
       )
+    }
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'CREATE',
+        'contact',
+        {
+          entity_id: data.id,
+          organization_id: data.organization_id,
+          description: `Created contact: ${data.name}`,
+          details: {
+            contact_id: data.id,
+            name: data.name,
+            contact_type: data.contact_type,
+            organization_id: data.organization_id,
+          },
+          request,
+          session,
+        }
+      );
     }
 
     return NextResponse.json(data, { status: 201 })

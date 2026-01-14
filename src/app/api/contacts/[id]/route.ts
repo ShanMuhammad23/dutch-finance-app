@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Contact, UpdateContactInput } from '@/lib/types'
 import { queryOne, query } from '@/lib/db'
+import { auth } from '../../auth/[...nextauth]/route'
+import { logActivityFromRequest } from '@/lib/activity-log'
 
 export async function GET(
   request: NextRequest,
@@ -37,6 +39,23 @@ export async function GET(
         { error: 'Contact not found' },
         { status: 404 }
       )
+    }
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'VIEW',
+        'contact',
+        {
+          entity_id: data.id,
+          organization_id: data.organization_id,
+          description: `Viewed contact: ${data.name}`,
+          details: { contact_id: data.id },
+          request,
+          session,
+        }
+      );
     }
 
     return NextResponse.json(data)
@@ -110,6 +129,26 @@ export async function PUT(
       )
     }
 
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'UPDATE',
+        'contact',
+        {
+          entity_id: result.id,
+          organization_id: result.organization_id,
+          description: `Updated contact: ${result.name}`,
+          details: {
+            contact_id: result.id,
+            changes: updates,
+          },
+          request,
+          session,
+        }
+      );
+    }
+
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error in PUT /api/contacts/[id]:', error)
@@ -155,6 +194,23 @@ export async function DELETE(
         { error: 'Contact not found' },
         { status: 404 }
       )
+    }
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'DELETE',
+        'contact',
+        {
+          entity_id: contactId,
+          organization_id: parseInt(organizationId),
+          description: `Deleted contact with ID: ${contactId}`,
+          details: { deleted_contact_id: contactId },
+          request,
+          session,
+        }
+      );
     }
 
     return NextResponse.json({ success: true })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { auth } from '@/app/api/auth/[...nextauth]/route'
+import { logActivityFromRequest } from '@/lib/activity-log'
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,6 +40,23 @@ export async function POST(request: NextRequest) {
         WHERE id = ${parseInt(session.user.id)}
       `
     }
+
+    // Log activity
+    await logActivityFromRequest(
+      'UPDATE',
+      'auth',
+      {
+        entity_id: parseInt(session.user.id),
+        user_id: parseInt(session.user.id),
+        description: `Two-factor authentication ${is2FAEnabled ? 'enabled' : 'disabled'}`,
+        details: {
+          user_id: parseInt(session.user.id),
+          is_twofactor: is2FAEnabled,
+        },
+        request,
+        session,
+      }
+    );
 
     return NextResponse.json(
       { 

@@ -6,6 +6,7 @@ import { sql } from "@/lib/db"
 import { sendHtmlEmail } from "@/lib/email"
 import type { JWT } from "next-auth/jwt"
 import type { Session, User } from "next-auth"
+import { logActivity } from "@/lib/activity-log"
 
 // Extend NextAuth types
 declare module "next-auth" {
@@ -223,6 +224,28 @@ If you didn't request this code, please ignore this email or contact support if 
           }
 
           console.log('✅ Password valid, creating session')
+          
+          // Log login activity
+          try {
+            await logActivity({
+              action: 'LOGIN',
+              entity_type: 'auth',
+              entity_id: null,
+              user_id: userProfile.id,
+              description: `User logged in: ${userProfile.full_name} (${userProfile.email})`,
+              details: {
+                user_id: userProfile.id,
+                email: userProfile.email,
+                role: userProfile.role,
+              },
+              ip_address: null, // Request not available in authorize function
+              user_agent: null,
+            })
+          } catch (error) {
+            // Don't fail login if logging fails
+            console.error('Failed to log login activity:', error)
+          }
+          
           return {
             id: userProfile.id.toString(),
             email: userProfile.email,

@@ -58,7 +58,20 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Invoice>
   
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.error || 'Failed to create invoice');
+    // Preserve limit error details
+    const errorMessage = new Error(error.error || 'Failed to create invoice') as Error & {
+      limitExceeded?: boolean
+      limitType?: string
+      current?: number
+      limit?: number | null
+    }
+    if (error.limitExceeded) {
+      errorMessage.limitExceeded = true
+      errorMessage.limitType = error.limitType
+      errorMessage.current = error.current
+      errorMessage.limit = error.limit
+    }
+    throw errorMessage
   }
   
   return response.json();

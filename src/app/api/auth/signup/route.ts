@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { hashPassword, validatePasswordStrength } from '@/lib/auth'
+import { logActivity } from '@/lib/activity-log'
+import { getIpAddress, getUserAgent } from '@/lib/activity-log'
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,6 +57,23 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Log activity (signup doesn't have session yet, so use logActivity directly)
+    await logActivity({
+      action: 'CREATE',
+      entity_type: 'user',
+      entity_id: data.id,
+      user_id: data.id,
+      description: `User signed up: ${data.full_name} (${data.email})`,
+      details: {
+        user_id: data.id,
+        full_name: data.full_name,
+        email: data.email,
+        role: data.role,
+      },
+      ip_address: getIpAddress(request),
+      user_agent: getUserAgent(request),
+    })
 
     return NextResponse.json(
       { 

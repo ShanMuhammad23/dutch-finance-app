@@ -1,9 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { Invoice } from '@/lib/types'
+import { auth } from '../../auth/[...nextauth]/route'
+import { logActivityFromRequest } from '@/lib/activity-log'
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -49,6 +51,23 @@ export async function GET(
     const transformedData: any = {
       ...data,
       contact: data.contact || null,
+    }
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'VIEW',
+        'invoice',
+        {
+          entity_id: data.id,
+          organization_id: data.organization_id,
+          description: `Viewed invoice #${data.invoice_number || data.id}`,
+          details: { invoice_id: data.id },
+          request,
+          session,
+        }
+      );
     }
 
     return NextResponse.json(transformedData as Invoice)

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryMany, queryOne } from '@/lib/db';
+import { auth } from '../auth/[...nextauth]/route';
+import { logActivityFromRequest } from '@/lib/activity-log';
 
 // GET all organizations for a user
 export async function GET(request: NextRequest) {
@@ -18,6 +20,21 @@ export async function GET(request: NextRequest) {
       'SELECT * FROM organizations WHERE created_by = $1 ORDER BY created_at DESC',
       [userId]
     );
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'VIEW',
+        'organization',
+        {
+          description: `Viewed organizations list`,
+          details: { user_id: userId, count: data.length },
+          request,
+          session,
+        }
+      );
+    }
 
     return NextResponse.json(data);
   } catch (error) {
@@ -67,6 +84,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Failed to create organization' },
         { status: 500 }
+      );
+    }
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'CREATE',
+        'organization',
+        {
+          entity_id: data.id,
+          organization_id: data.id,
+          description: `Created organization: ${data.company_name}`,
+          details: {
+            organization_id: data.id,
+            company_name: data.company_name,
+            business_type: data.business_type,
+          },
+          request,
+          session,
+        }
       );
     }
 

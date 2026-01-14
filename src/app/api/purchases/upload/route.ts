@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
+import { auth } from '../../auth/[...nextauth]/route';
+import { logActivityFromRequest } from '@/lib/activity-log';
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,6 +57,27 @@ export async function POST(request: NextRequest) {
 
     // Return the public URL path
     const publicPath = `/attachments/${fileName}`;
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'CREATE',
+        'purchase',
+        {
+          description: `Uploaded file: ${file.name}`,
+          details: {
+            originalFileName: file.name,
+            storedFileName: fileName,
+            filePath: publicPath,
+            fileSize: file.size,
+            fileType: file.type,
+          },
+          request,
+          session,
+        }
+      );
+    }
 
     return NextResponse.json(
       {

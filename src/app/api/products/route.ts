@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { queryMany, queryOne } from "@/lib/db";
 import { CreateProductInput, Product, ProductAccountCode } from "@/lib/types";
+import { auth } from '../auth/[...nextauth]/route';
+import { logActivityFromRequest } from '@/lib/activity-log';
 
 const ACCOUNT_CODES: Record<ProductAccountCode, string> = {
   "1000": "Quota",
@@ -45,6 +47,22 @@ export async function GET(request: NextRequest) {
       "SELECT * FROM products WHERE organization_id = $1 ORDER BY updated_at DESC",
       [parsedId]
     );
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'VIEW',
+        'product',
+        {
+          organization_id: parsedId,
+          description: `Viewed products list`,
+          details: { organization_id: parsedId, count: data.length },
+          request,
+          session,
+        }
+      );
+    }
 
     return NextResponse.json(data ?? []);
   } catch (error) {
@@ -111,6 +129,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Failed to create product" },
         { status: 500 },
+      );
+    }
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'CREATE',
+        'product',
+        {
+          entity_id: data.id,
+          organization_id: data.organization_id,
+          description: `Created product: ${data.name}`,
+          details: {
+            product_id: data.id,
+            name: data.name,
+            price_excl_vat: data.price_excl_vat,
+            account_code: data.account_code,
+            organization_id: data.organization_id,
+          },
+          request,
+          session,
+        }
       );
     }
 

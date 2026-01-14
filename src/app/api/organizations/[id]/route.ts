@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne, query } from '@/lib/db';
+import { auth } from '../../auth/[...nextauth]/route';
+import { logActivityFromRequest } from '@/lib/activity-log';
 
 // GET single organization
 export async function GET(
@@ -27,6 +29,23 @@ export async function GET(
       return NextResponse.json(
         { error: 'Organization not found' },
         { status: 404 }
+      );
+    }
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'VIEW',
+        'organization',
+        {
+          entity_id: data.id,
+          organization_id: data.id,
+          description: `Viewed organization: ${data.company_name}`,
+          details: { organization_id: data.id },
+          request,
+          session,
+        }
       );
     }
 
@@ -93,6 +112,26 @@ export async function PUT(
       );
     }
 
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'UPDATE',
+        'organization',
+        {
+          entity_id: data.id,
+          organization_id: data.id,
+          description: `Updated organization: ${data.company_name}`,
+          details: {
+            organization_id: data.id,
+            changes: updates,
+          },
+          request,
+          session,
+        }
+      );
+    }
+
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error in PUT /api/organizations/[id]:', error);
@@ -129,6 +168,23 @@ export async function DELETE(
       return NextResponse.json(
         { error: 'Organization not found' },
         { status: 404 }
+      );
+    }
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'DELETE',
+        'organization',
+        {
+          entity_id: Number(id),
+          organization_id: Number(id),
+          description: `Deleted organization with ID: ${id}`,
+          details: { deleted_organization_id: Number(id) },
+          request,
+          session,
+        }
       );
     }
 

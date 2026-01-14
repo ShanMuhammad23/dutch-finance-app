@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { queryMany, queryOne } from "@/lib/db";
 import { CreatePurchaseInput, Purchase, PurchaseLine } from "@/lib/types";
+import { auth } from '../auth/[...nextauth]/route';
+import { logActivityFromRequest } from '@/lib/activity-log';
 
 type SupabasePurchase = Omit<
   Purchase,
@@ -97,6 +99,22 @@ export async function GET(request: NextRequest) {
         linesByPurchaseId.get(purchase.id),
       ),
     );
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'VIEW',
+        'purchase',
+        {
+          organization_id: parsedId,
+          description: `Viewed purchases list`,
+          details: { organization_id: parsedId, count: purchases.length },
+          request,
+          session,
+        }
+      );
+    }
 
     return NextResponse.json(purchases);
   } catch (error) {
@@ -227,6 +245,28 @@ export async function POST(request: NextRequest) {
       },
       insertedLines ?? fallbackLines,
     );
+
+    // Log activity
+    const session = await auth();
+    if (session?.user) {
+      await logActivityFromRequest(
+        'CREATE',
+        'purchase',
+        {
+          entity_id: data.id,
+          organization_id: data.organization_id,
+          description: `Created purchase: ${data.supplier_name}`,
+          details: {
+            purchase_id: data.id,
+            supplier_name: data.supplier_name,
+            amount_incl_vat: data.amount_incl_vat,
+            organization_id: data.organization_id,
+          },
+          request,
+          session,
+        }
+      );
+    }
 
     return NextResponse.json(responseBody, { status: 201 });
   } catch (error) {

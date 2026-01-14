@@ -73,9 +73,7 @@ export async function sendEmail(options: EmailOptions): Promise<nodemailer.SentM
   }
 }
 
-/**
- * Send a simple text email
- */
+
 export async function sendTextEmail(
   to: string | string[],
   subject: string,
@@ -85,9 +83,7 @@ export async function sendTextEmail(
   return sendEmail({ to, subject, text, from })
 }
 
-/**
- * Send an HTML email
- */
+
 export async function sendHtmlEmail(
   to: string | string[],
   subject: string,

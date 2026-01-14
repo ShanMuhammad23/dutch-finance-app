@@ -7,6 +7,7 @@ import { InvoiceItemsTable } from "@/components/invoices/invoice-items-table"
 import { InvoiceSummary } from "@/components/invoices/invoice-summary"
 import { InvoiceActions } from "@/components/invoices/invoice-actions"
 import { ContactInfoDisplay } from "@/components/invoices/contact-info-display"
+import { InvoicePreview } from "@/components/invoices/invoice-preview"
 import { useActiveOrganization } from "@/context/organization-context"
 import { useInvoiceForm } from "@/hooks/use-invoice-form"
 import { useOrganizationProducts } from "@/lib/queries/products"
@@ -189,6 +190,36 @@ export default function InvoicesPage() {
           <ContactInfoDisplay contact={selectedContact} />
         </div>
       )}
+
+      {/* Invoice Preview */}
+      <div className="rounded-2xl border bg-white shadow-sm dark:border-dark-3 dark:bg-dark-2">
+        <div className="border-b p-6 dark:border-dark-3">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Invoice Preview</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Preview how your invoice will look. Drag and drop files to attach them.
+          </p>
+        </div>
+        <div className="p-6">
+          <InvoicePreview
+            organization={activeOrganization}
+            contact={selectedContact || null}
+            invoiceNumber={invoiceNumber}
+            issueDate={issueDate}
+            dueDate={dueDate}
+            paymentTerms={paymentTerms}
+            items={items}
+            currency={activeOrganization?.currency || 'DKK'}
+            bankRegNo={bankRegNo}
+            bankAccountNo={bankAccountNo}
+            interestRate={interestRate}
+            lateFee={lateFee}
+            onFilesDropped={(files) => {
+              // Handle file uploads - you can implement file upload logic here
+              console.log('Files dropped:', files)
+            }}
+          />
+        </div>
+      </div>
     </div>
   )
 }
