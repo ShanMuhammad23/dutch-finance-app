@@ -4,7 +4,8 @@ import { useState, useCallback, useRef } from "react"
 import { Upload, FileText, X, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { parseBankStatementFile, BankStatementUpload } from "@/lib/bank-csv-parser"
+import type { BankStatementUpload } from "@/lib/types"
+import { parseBankStatementFile } from "@/lib/bank-csv-parser"
 import { BankStatementReview } from "./bank-statement-review"
 
 interface BankStatementUploadProps {

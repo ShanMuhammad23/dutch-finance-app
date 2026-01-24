@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import NextAuth, { type NextAuthConfig } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { queryOne } from "@/lib/db"
@@ -184,7 +183,6 @@ If you didn't request this code, please ignore this email or contact support if 
               FROM users 
               WHERE id = ${userProfile.id}
             `
-
             if (!userWithOTP[0]?.otp) {
               console.log('❌ No OTP found in database for user')
               const error: any = new Error('OTP_NOT_FOUND: No verification code found. Please request a new code.')
@@ -296,8 +294,6 @@ If you didn't request this code, please ignore this email or contact support if 
 }
 
 const { handlers, auth } = NextAuth(authOptions)
-=======
-import { handlers } from "@/lib/auth-config"
->>>>>>> d81abe5a6f50e02670cc1058d2aa04a61e0ed1ac
 
 export const { GET, POST } = handlers
+export { auth }

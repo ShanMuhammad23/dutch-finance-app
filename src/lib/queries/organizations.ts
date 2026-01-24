@@ -1,26 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-
-export interface Organization {
-  id: number | string;
-  created_by: number | string;
-  business_type: string;
-  company_name: string;
-  address_line: string | null;
-  postal_code: string | null;
-  city: string | null;
-  country: string;
-  email: string | null;
-  attention_person: string | null;
-  vat_number: string | null;
-  currency: string;
-  status: string;
-  subscription_plan: string;
-  data_processing_agreement: boolean;
-  // Optional logo filename or path
-  logo?: string | null;
-  created_at: string;
-  updated_at: string;
-}
+import type { Organization } from "@/lib/types";
 
 export interface CreateOrganizationInput {
   business_type: string;

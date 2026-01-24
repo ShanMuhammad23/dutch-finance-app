@@ -1,7 +1,7 @@
 "use client";
 
 import { useUserOrganizations } from "@/lib/queries/organizations";
-import { Organization } from "@/lib/queries/organizations";
+import type { Organization } from "@/lib/types";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 

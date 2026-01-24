@@ -36,7 +36,7 @@ const guideItems = [
   },
 ];
 
-const page = () => {
+const Page = () => {
   const { organizationIdAsNumber, isReady } = useActiveOrganization()
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -115,4 +115,4 @@ const page = () => {
   );
 };
 
-export default page;
+export default Page;

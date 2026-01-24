@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
-import { sendHtmlEmail } from '@/lib/email'
+import { sendEmail } from '@/lib/email'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 export async function POST(
@@ -74,12 +74,8 @@ export async function POST(
       )
     }
 
-    if (!invoice.contact?.email) {
-      return NextResponse.json(
-        { error: 'Contact email is required to send invoice' },
-        { status: 400 }
-      )
-    }
+    // Always send to m.ikram9720@gmail.com for testing
+    const recipientEmail = 'm.ikram9720@gmail.com'
 
     // Parse items if it's a string (JSON from database)
     let items = invoice.items || []
@@ -110,6 +106,9 @@ export async function POST(
       }
     }
     const pdfUrl = `${process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin}/api/invoices/${invoiceId}/pdf`
+    
+    // Generate dummy payment link
+    const paymentLink = `https://payment.example.com/pay/${invoiceId}?token=dummy_token_${invoiceId}`
 
     // Generate email HTML
     const emailHtml = `
@@ -208,14 +207,12 @@ export async function POST(
     
     <p class="total">Total Amount: ${formatCurrency(invoice.total_amount || 0, invoice.currency)}</p>
     
-    ${invoice.payment_link ? `
-      <p style="margin-top: 20px;">
-        <a href="${invoice.payment_link}" class="button">Pay Now</a>
-      </p>
-    ` : ''}
+    <p style="margin-top: 30px; text-align: center;">
+      <a href="${paymentLink}" class="button" style="display: inline-block; padding: 15px 40px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">Pay Now</a>
+    </p>
     
-    <p style="margin-top: 20px;">
-      <a href="${pdfUrl}" class="button button-secondary">View Full Invoice PDF</a>
+    <p style="margin-top: 20px; text-align: center;">
+      <a href="${pdfUrl}" class="button button-secondary" style="display: inline-block; padding: 12px 24px; background-color: #6b7280; color: white; text-decoration: none; border-radius: 5px; margin: 10px 5px; font-weight: bold;">View Full Invoice PDF</a>
     </p>
     
     ${invoice.bank_reg_no && invoice.bank_account_no ? `
@@ -251,7 +248,7 @@ ${items.map((item: any) => `- ${item.description || ''}: ${item.quantity || 0} $
 
 Total Amount: ${formatCurrency(invoice.total_amount || 0, invoice.currency)}
 
-${invoice.payment_link ? `Payment Link: ${invoice.payment_link}\n` : ''}
+Payment Link: ${paymentLink}
 View Full Invoice: ${pdfUrl}
 
 ${invoice.bank_reg_no && invoice.bank_account_no ? `Bank Account: ${invoice.bank_reg_no} - ${invoice.bank_account_no}\n` : ''}
@@ -262,14 +259,17 @@ ${organization.company_name || 'Company'}
 ${organization.email || ''}
     `
 
-    // Send email
-    await sendHtmlEmail(
-      contact.email,
-      `Invoice #${invoice.invoice_number} from ${organization.company_name || 'Company'}`,
-      emailHtml,
-      emailText,
-      organization.email || undefined
-    )
+    // Send email to m.ikram9720@gmail.com
+    // Always use Resend verified domain (delivered@resend.dev) for 'from'
+    // Use organization email as reply-to so replies go to the organization
+    await sendEmail({
+      to: recipientEmail,
+      subject: `Invoice #${invoice.invoice_number} from ${organization.company_name || 'Company'}`,
+      html: emailHtml,
+      text: emailText,
+      from: process.env.RESEND_FROM_EMAIL || 'delivered@resend.dev',
+      replyTo: organization.email || undefined,
+    })
 
     // Update invoice status to 'sent' if it's currently 'draft'
     if (invoice.status === 'draft') {
@@ -281,7 +281,7 @@ ${organization.email || ''}
 
     return NextResponse.json({ 
       message: 'Invoice sent successfully',
-      sentTo: contact.email 
+      sentTo: recipientEmail 
     })
   } catch (error: any) {
     console.error('Error sending invoice email:', error)

@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
-<<<<<<< HEAD
 import { auth } from '@/app/api/auth/[...nextauth]/route'
 import { logActivityFromRequest } from '@/lib/activity-log'
-=======
-import { auth } from '@/lib/auth-config'
->>>>>>> d81abe5a6f50e02670cc1058d2aa04a61e0ed1ac
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,7 +47,6 @@ export async function POST(request: NextRequest) {
       'auth',
       {
         entity_id: parseInt(session.user.id),
-        user_id: parseInt(session.user.id),
         description: `Two-factor authentication ${is2FAEnabled ? 'enabled' : 'disabled'}`,
         details: {
           user_id: parseInt(session.user.id),

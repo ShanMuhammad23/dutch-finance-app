@@ -1,12 +1,8 @@
-/**
- * Utility functions for checking plan limits
- */
+
 
 import { queryOne } from '@/lib/db'
 
-/**
- * Count invoices created in the current month for an organization
- */
+
 export async function countInvoicesThisMonth(organizationId: number): Promise<number> {
   const now = new Date()
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -24,13 +20,8 @@ export async function countInvoicesThisMonth(organizationId: number): Promise<nu
   return result ? parseInt(result.count, 10) : 0
 }
 
-/**
- * Count users associated with an organization
- * Currently counts the creator, but can be extended when organization_members table is added
- */
+
 export async function countOrganizationUsers(organizationId: number): Promise<number> {
-  // For now, each organization has one user (the creator)
-  // When organization_members table is added, this should count all members
   const result = await queryOne<{ count: string }>(
     `SELECT COUNT(DISTINCT created_by) as count 
      FROM organizations 
@@ -41,9 +32,7 @@ export async function countOrganizationUsers(organizationId: number): Promise<nu
   return result ? parseInt(result.count, 10) : 1
 }
 
-/**
- * Get organization subscription plan
- */
+
 export async function getOrganizationPlan(organizationId: number): Promise<string> {
   const result = await queryOne<{ subscription_plan: string }>(
     `SELECT subscription_plan 

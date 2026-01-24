@@ -19,7 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Product, CreateProductInput, ProductAccountCode } from "@/lib/types";
 
-const page = () => {
+const Page = () => {
   const [showFilter, setShowFilter] = useState(false);
   const [filterName, setFilterName] = useState("");
   const [filterAccountCode, setFilterAccountCode] = useState<ProductAccountCode | "">("");
@@ -373,5 +373,5 @@ const page = () => {
   );
 };
 
-export default page;
+export default Page;
 

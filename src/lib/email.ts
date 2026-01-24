@@ -1,30 +1,7 @@
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
-// MailerSend SMTP configuration
-const smtpConfig = {
-  host: process.env.SMTP_HOST,
-  port: 587, // MailerSend SMTP port (587 for TLS, 465 for SSL)
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USERNAME,
-    pass: process.env.SMTP_PASSWORD,
-  },
-}
-
-// Create reusable transporter
-let transporter: nodemailer.Transporter | null = null
-
-function getTransporter(): nodemailer.Transporter {
-  if (!transporter) {
-    if (!process.env.SMTP_HOST || !process.env.SMTP_USERNAME || !process.env.SMTP_PASSWORD) {
-      throw new Error('SMTP configuration is missing. Please set SMTP_HOST, SMTP_USERNAME, and SMTP_PASSWORD environment variables.')
-    }
-
-    transporter = nodemailer.createTransport(smtpConfig)
-  }
-
-  return transporter
-}
+// Initialize Resend client
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 export interface EmailOptions {
   to: string | string[]
@@ -44,68 +21,89 @@ export interface EmailOptions {
 }
 
 /**
- * Send an email using MailerSend SMTP
+ * Send an email using Resend
  * @param options Email options (to, subject, text/html, etc.)
  * @returns Promise with message info
  */
-export async function sendEmail(options: EmailOptions): Promise<nodemailer.SentMessageInfo> {
+export async function sendEmail(options: EmailOptions): Promise<{ id: string }> {
   try {
-    const mailTransporter = getTransporter()
-
-    const mailOptions = {
-      from: options.from || process.env.SMTP_USERNAME,
-      to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
-      subject: options.subject,
-      text: options.text,
-      html: options.html,
-      replyTo: options.replyTo,
-      cc: options.cc ? (Array.isArray(options.cc) ? options.cc.join(', ') : options.cc) : undefined,
-      bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc.join(', ') : options.bcc) : undefined,
-      attachments: options.attachments,
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error('RESEND_API_KEY environment variable is not set')
     }
 
-    const info = await mailTransporter.sendMail(mailOptions)
-    console.log('Email sent successfully:', info.messageId)
-    return info
+    // Always use Resend verified domain for 'from' address
+    // Use organization email as reply-to instead
+    const fromEmail = options.from || process.env.RESEND_FROM_EMAIL || 'delivered@resend.dev'
+    
+    // Convert attachments if provided
+    const attachments = options.attachments?.map(att => ({
+      filename: att.filename,
+      content: typeof att.content === 'string' 
+        ? Buffer.from(att.content, 'utf-8').toString('base64')
+        : att.content instanceof Buffer
+        ? att.content.toString('base64')
+        : undefined,
+      content_type: att.contentType,
+    })).filter(att => att.content !== undefined)
+
+    const result = await resend.emails.send({
+      from: fromEmail,
+      to: Array.isArray(options.to) ? options.to : [options.to],
+      subject: options.subject,
+      html: options.html,
+      text: options.text,
+      replyTo: options.replyTo,
+      cc: options.cc ? (Array.isArray(options.cc) ? options.cc : [options.cc]) : undefined,
+      bcc: options.bcc ? (Array.isArray(options.bcc) ? options.bcc : [options.bcc]) : undefined,
+      attachments: attachments && attachments.length > 0 ? attachments : undefined,
+    } as any)
+
+    console.log('Email sent successfully:', result.data?.id)
+    return { id: result.data?.id || 'unknown' }
   } catch (error) {
     console.error('Error sending email:', error)
     throw error
   }
 }
 
-
+/**
+ * Send a plain text email using Resend
+ */
 export async function sendTextEmail(
   to: string | string[],
   subject: string,
   text: string,
   from?: string
-): Promise<nodemailer.SentMessageInfo> {
+): Promise<{ id: string }> {
   return sendEmail({ to, subject, text, from })
 }
 
-
+/**
+ * Send an HTML email using Resend
+ */
 export async function sendHtmlEmail(
   to: string | string[],
   subject: string,
   html: string,
   text?: string,
   from?: string
-): Promise<nodemailer.SentMessageInfo> {
+): Promise<{ id: string }> {
   return sendEmail({ to, subject, html, text, from })
 }
 
 /**
- * Verify SMTP connection
+ * Verify Resend API key is configured
  */
 export async function verifyEmailConnection(): Promise<boolean> {
   try {
-    const mailTransporter = getTransporter()
-    await mailTransporter.verify()
-    console.log('SMTP connection verified successfully')
+    if (!process.env.RESEND_API_KEY) {
+      console.error('RESEND_API_KEY is not configured')
+      return false
+    }
+    console.log('Resend API key is configured')
     return true
   } catch (error) {
-    console.error('SMTP connection verification failed:', error)
+    console.error('Resend connection verification failed:', error)
     return false
   }
 }
-

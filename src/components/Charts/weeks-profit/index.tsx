@@ -11,6 +11,14 @@ type PropsType = {
 export async function WeeksProfit({ className, timeFrame }: PropsType) {
   const data = await getWeeksProfitData(timeFrame);
 
+  // Transform service data (sales & revenue) into profit series expected by the chart
+  const chartData = {
+    profit: data.sales.map((point, index) => ({
+      x: point.x,
+      y: (data.revenue?.[index]?.y ?? 0) - point.y,
+    })),
+  };
+
   return (
     <div
       className={cn(
@@ -30,7 +38,7 @@ export async function WeeksProfit({ className, timeFrame }: PropsType) {
         />
       </div>
 
-      <WeeksProfitChart data={data} />
+      <WeeksProfitChart data={chartData} />
     </div>
   );
 }

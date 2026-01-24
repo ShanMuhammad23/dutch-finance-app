@@ -168,11 +168,12 @@ const ProductsTable = ({ filterName = "", filterAccountCode = "" }: ProductsTabl
                     <p className="text-xs text-[#D34053]">{error.message}</p>
                   )}
                   <Button
-                    label="Try again"
-                    size="small"
-                    variant="outlineDark"
+                    size="sm"
+                    variant="outline"
                     onClick={() => refetch()}
-                  />
+                  >
+                    Try again
+                  </Button>
                 </div>
               </TableCell>
             </TableRow>

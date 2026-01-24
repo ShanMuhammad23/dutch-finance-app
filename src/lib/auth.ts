@@ -41,21 +41,13 @@ export function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
-/**
- * Check if OTP has expired
- * @param expiryDate OTP expiry date as string or Date
- * @returns true if expired, false if still valid
- */
+
 export function isOTPExpired(expiryDate: string | Date): boolean {
   const expiry = typeof expiryDate === 'string' ? new Date(expiryDate) : expiryDate
   return expiry < new Date()
 }
 
-/**
- * Get OTP expiry date (default: 10 minutes from now)
- * @param minutes Number of minutes until expiry (default: 10)
- * @returns Date object for expiry
- */
+
 export function getOTPExpiry(minutes: number = 10): Date {
   const expiry = new Date()
   expiry.setMinutes(expiry.getMinutes() + minutes)

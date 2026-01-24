@@ -221,7 +221,16 @@ export async function POST(request: NextRequest) {
       line_total: calculateLineTotal(item.quantity, item.unit_price, item.discount ?? 0),
     }))
 
-<<<<<<< HEAD
+    // Insert invoice items (line_total is a generated column, so we don't insert it)
+    for (const item of itemsWithTotals) {
+      await queryOne(
+        `INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, discount)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [item.invoice_id, item.description, item.quantity, item.unit, item.unit_price, item.discount]
+      )
+    }
+
     // Log activity
     const session = await auth();
     if (session?.user) {
@@ -243,15 +252,6 @@ export async function POST(request: NextRequest) {
           session,
         }
       );
-=======
-    // Insert invoice items (line_total is a generated column, so we don't insert it)
-    for (const item of itemsWithTotals) {
-      await queryOne(
-        `INSERT INTO invoice_items (invoice_id, description, quantity, unit, unit_price, discount)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING *`,
-        [item.invoice_id, item.description, item.quantity, item.unit, item.unit_price, item.discount]
-      )
     }
 
     // If status is 'sent' and contact has email, send email automatically
@@ -275,7 +275,6 @@ export async function POST(request: NextRequest) {
         console.error('Error sending invoice email:', emailError)
         // Don't fail the request if email fails
       }
->>>>>>> d81abe5a6f50e02670cc1058d2aa04a61e0ed1ac
     }
 
     return NextResponse.json(

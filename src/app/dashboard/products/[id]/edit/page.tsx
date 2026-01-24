@@ -33,7 +33,7 @@ const accountOptions: { value: ProductAccountCode; label: string }[] = [
   { value: "9010", label: "9010 · Financial income, other" },
 ];
 
-function parseDecimal(input: string) {
+function parseDecimal(input: string | undefined) {
   if (!input) return 0;
   const normalized = input.replace(/\./g, "").replace(",", ".");
   const parsed = Number(normalized);
