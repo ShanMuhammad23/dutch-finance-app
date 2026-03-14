@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { BankStatementUpload } from "@/components/bank/bank-statement-upload";
 import { BankImportHistory } from "@/components/bank/bank-import-history";
+import { BankTransactionsReconcile } from "@/components/bank/bank-transactions-reconcile";
 import { useActiveOrganization } from "@/context/organization-context";
 import { BankStatementUpload as BankStatementUploadType } from "@/lib/types";
 
@@ -93,10 +94,6 @@ const Page = () => {
             <h3 className="text-xl font-semibold text-dark dark:text-white">
               Import bank statement
             </h3>
-            <p className="text-body-sm text-gray-600 dark:text-gray-4">
-              Upload a CSV or XLSX file from your Danish bank to import transactions. The system will
-              automatically detect the format and show a preview before importing.
-            </p>
           </div>
 
           <BankStatementUpload
@@ -111,6 +108,9 @@ const Page = () => {
 
       {/* Import History */}
       <BankImportHistory refreshKey={refreshKey} />
+
+      {/* Reconcile: link imported transactions to invoices/purchases */}
+      <BankTransactionsReconcile organizationId={organizationIdAsNumber} refreshKey={refreshKey} />
     </div>
   );
 };

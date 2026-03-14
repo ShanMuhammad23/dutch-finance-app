@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
     )
 
     // Calculate EXPENSES from bank transactions (negative amounts = debits)
+    // Exclude transactions linked to a purchase to avoid double-counting (purchase already in purchasesExpensesData)
     const bankExpensesData = await queryOne<any>(
       `SELECT 
         COALESCE(SUM(ABS(amount)), 0) as total_expenses,
@@ -76,6 +77,7 @@ export async function GET(request: NextRequest) {
       FROM bank_transactions
       WHERE organization_id = $1
         AND amount < 0
+        AND purchase_id IS NULL
         ${dateFilter}`,
       dateParams
     )
@@ -92,6 +94,7 @@ export async function GET(request: NextRequest) {
     )
 
     // Calculate INCOME from bank transactions (positive amounts = credits)
+    // Exclude transactions linked to an invoice to avoid double-counting (invoice already in incomeData)
     const bankIncomeData = await queryOne<any>(
       `SELECT 
         COALESCE(SUM(amount), 0) as total_income,
@@ -99,16 +102,17 @@ export async function GET(request: NextRequest) {
       FROM bank_transactions
       WHERE organization_id = $1
         AND amount > 0
+        AND invoice_id IS NULL
         ${dateFilter}`,
       dateParams
     )
 
-    // Get time series data for charts (monthly breakdown)
+    // Get time series data for charts (monthly breakdown); exclude linked tx to avoid double-count
     const timeSeriesData = await queryMany<any>(
       `SELECT 
         DATE_TRUNC('month', transaction_date) as month,
-        SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) as expenses,
-        SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) as income
+        SUM(CASE WHEN amount < 0 AND purchase_id IS NULL THEN ABS(amount) ELSE 0 END) as expenses,
+        SUM(CASE WHEN amount > 0 AND invoice_id IS NULL THEN amount ELSE 0 END) as income
       FROM bank_transactions
       WHERE organization_id = $1
         ${dateFilter}
@@ -199,6 +203,7 @@ export async function GET(request: NextRequest) {
          FROM bank_transactions
          WHERE organization_id = $1
            AND amount > 0
+           AND invoice_id IS NULL
            AND transaction_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
            AND transaction_date < DATE_TRUNC('month', CURRENT_DATE)`,
         [parsedOrgId]
@@ -209,6 +214,7 @@ export async function GET(request: NextRequest) {
          FROM bank_transactions
          WHERE organization_id = $1
            AND amount < 0
+           AND purchase_id IS NULL
            AND transaction_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
            AND transaction_date < DATE_TRUNC('month', CURRENT_DATE)`,
         [parsedOrgId]

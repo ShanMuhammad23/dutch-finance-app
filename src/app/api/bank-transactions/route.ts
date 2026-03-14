@@ -30,9 +30,16 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await queryMany<any>(
-      `SELECT * FROM bank_transactions 
-       WHERE organization_id = $1 
-       ORDER BY transaction_date DESC, created_at DESC`,
+      `SELECT bt.*,
+        bt.invoice_id,
+        bt.purchase_id,
+        (SELECT json_build_object('id', i.id, 'invoice_number', i.invoice_number, 'total_amount', i.total_amount, 'contact', (SELECT json_build_object('name', c.name) FROM contacts c WHERE c.id = i.contact_id))
+         FROM invoices i WHERE i.id = bt.invoice_id) AS invoice,
+        (SELECT json_build_object('id', p.id, 'supplier_name', p.supplier_name, 'amount_incl_vat', p.amount_incl_vat, 'attachment_date', p.attachment_date)
+         FROM purchases p WHERE p.id = bt.purchase_id) AS purchase
+       FROM bank_transactions bt
+       WHERE bt.organization_id = $1
+       ORDER BY bt.transaction_date DESC, bt.created_at DESC`,
       [parsedId]
     )
 
@@ -163,8 +170,10 @@ export async function POST(request: NextRequest) {
             counterparty,
             account_number,
             currency,
-            transaction_type
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            transaction_type,
+            invoice_id,
+            purchase_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
           RETURNING *`,
           [
             parsedOrgId,
@@ -178,6 +187,8 @@ export async function POST(request: NextRequest) {
             transaction.account_number || null,
             transaction.currency || 'DKK',
             transaction.transaction_type || (transaction.amount >= 0 ? 'credit' : 'debit'),
+            transaction.invoice_id ?? null,
+            transaction.purchase_id ?? null,
           ]
         )
 

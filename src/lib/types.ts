@@ -145,8 +145,15 @@ export interface BankTransaction {
   currency?: string;
   transaction_type?: 'debit' | 'credit';
   category?: string;
+  /** When set, this credit is the payment for this invoice; excluded from bank income in stats */
+  invoice_id?: number | null;
+  /** When set, this debit is the payment for this purchase; excluded from bank expenses in stats */
+  purchase_id?: number | null;
   created_at?: string;
   updated_at?: string;
+  // Populated by API when joined
+  invoice?: { id: number; invoice_number: number; total_amount: number; contact?: { name?: string } } | null;
+  purchase?: { id: number; supplier_name: string; amount_incl_vat: number; attachment_date: string } | null;
 }
 
 export interface ParsedBankTransaction {
@@ -162,6 +169,20 @@ export interface ParsedBankTransaction {
   transaction_type?: 'debit' | 'credit';
   errors?: string[];
   warnings?: string[];
+}
+
+/** Match suggestion for linking a bank transaction to an invoice or purchase */
+export interface BankTransactionMatchSuggestion {
+  id: number;
+  type: 'invoice' | 'purchase';
+  score: number; // 0-100, higher = better match
+  matchReason?: string;
+  invoice_number?: number;
+  total_amount: number;
+  contact_name?: string;
+  supplier_name?: string;
+  issue_date?: string;
+  attachment_date?: string;
 }
 
 export interface BankStatementUpload {

@@ -45,12 +45,16 @@ export function BankImportHistory({ refreshKey }: BankImportHistoryProps) {
   })
 
   const formatCurrency = (amount: number, currency: string = 'DKK') => {
-    return new Intl.NumberFormat('da-DK', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
+    const sign = amount < 0 ? '-' : ''
+    const absolute = Math.abs(amount)
+    const [intPart, decPart] = absolute.toFixed(2).split('.')
+
+    // Group thousands with spaces to avoid mixing dots and commas
+    const groupedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+
+    const currencyLabel = currency === 'DKK' ? 'kr.' : currency
+
+    return `${sign}${groupedInt}.${decPart} ${currencyLabel}`
   }
 
   const formatDate = (dateString: string) => {

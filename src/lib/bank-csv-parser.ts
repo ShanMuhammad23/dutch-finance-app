@@ -59,7 +59,6 @@ function normalizeColumnName(name: string): string {
   return name
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s]/g, '')
     .replace(/\s+/g, ' ')
 }
 
@@ -83,14 +82,18 @@ function findColumnIndex(headers: string[], mappings: string[]): number {
  */
 function parseDanishDate(dateStr: string): string | null {
   if (!dateStr || dateStr.trim() === '') return null
+
+  // Normalize common separators so we support dots, slashes and dashes transparently
+  // e.g. 05.02.2026, 05-02-2026, 05/02/2026 will all be handled
+  const normalizedInput = dateStr.trim().replace(/[.]/g, '-')
   
   // Try ISO format first (YYYY-MM-DD)
-  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-    return dateStr.split(' ')[0] // Take date part only
+  if (/^\d{4}-\d{2}-\d{2}/.test(normalizedInput)) {
+    return normalizedInput.split(' ')[0] // Take date part only
   }
   
   // Try DD-MMM-YY or DD-MMM-YYYY (e.g., "28-Apr-17" or "28-Apr-2017")
-  const dmyMatch = dateStr.match(/^(\d{1,2})[-\/](\w{3})[-\/](\d{2,4})/i)
+  const dmyMatch = normalizedInput.match(/^(\d{1,2})[-\/](\w{3})[-\/](\d{2,4})/i)
   if (dmyMatch) {
     const [, day, monthStr, yearStr] = dmyMatch
     const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
@@ -112,14 +115,14 @@ function parseDanishDate(dateStr: string): string | null {
   }
   
   // Try DD-MM-YYYY or DD/MM/YYYY
-  const dmyNumericMatch = dateStr.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/)
+  const dmyNumericMatch = normalizedInput.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/)
   if (dmyNumericMatch) {
     const [, day, month, year] = dmyNumericMatch
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
   }
   
   // Try YYYY-MM-DD
-  const ymdMatch = dateStr.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/)
+  const ymdMatch = normalizedInput.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/)
   if (ymdMatch) {
     return ymdMatch[0]
   }
