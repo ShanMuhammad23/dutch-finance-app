@@ -1,5 +1,4 @@
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
+
 
 CREATE TABLE public.activity_logs (
   id integer NOT NULL DEFAULT nextval('activity_logs_id_seq'::regclass),
@@ -16,6 +15,30 @@ CREATE TABLE public.activity_logs (
   CONSTRAINT activity_logs_pkey PRIMARY KEY (id),
   CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES public.users(id),
   CONSTRAINT fk_organization FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
+);
+CREATE TABLE public.bank_transactions (
+  id bigint NOT NULL DEFAULT nextval('bank_transactions_id_seq'::regclass),
+  organization_id bigint NOT NULL,
+  transaction_date date NOT NULL,
+  value_date date,
+  description text NOT NULL,
+  amount numeric NOT NULL,
+  balance numeric,
+  reference character varying,
+  counterparty character varying,
+  account_number character varying,
+  currency character varying DEFAULT 'DKK'::character varying,
+  transaction_type character varying DEFAULT 'credit'::character varying,
+  category character varying,
+  created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+  invoice_id bigint,
+  purchase_id bigint,
+  CONSTRAINT bank_transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT bank_transactions_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT fk_bank_transactions_organization FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT bank_transactions_invoice_id_fkey FOREIGN KEY (invoice_id) REFERENCES public.invoices(id),
+  CONSTRAINT bank_transactions_purchase_id_fkey FOREIGN KEY (purchase_id) REFERENCES public.purchases(id)
 );
 CREATE TABLE public.contacts (
   id bigint NOT NULL DEFAULT nextval('contacts_id_seq'::regclass),
@@ -34,6 +57,12 @@ CREATE TABLE public.contacts (
   CONSTRAINT contacts_pkey PRIMARY KEY (id),
   CONSTRAINT contacts_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id)
 );
+CREATE TABLE public.invoice_copies (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT invoice_copies_pkey PRIMARY KEY (id),
+  CONSTRAINT invoice_copies_id_fkey FOREIGN KEY (id) REFERENCES public.invoices(id)
+);
 CREATE TABLE public.invoice_items (
   id bigint NOT NULL DEFAULT nextval('invoice_items_id_seq'::regclass),
   invoice_id bigint NOT NULL,
@@ -46,35 +75,35 @@ CREATE TABLE public.invoice_items (
   CONSTRAINT invoice_items_pkey PRIMARY KEY (id),
   CONSTRAINT invoice_items_invoice_id_fkey FOREIGN KEY (invoice_id) REFERENCES public.invoices(id)
 );
-create table public.invoices (
-  id bigserial not null,
-  organization_id bigint not null,
-  contact_id bigint null,
-  created_by bigint null,
-  invoice_number serial not null,
-  issue_date date not null default CURRENT_DATE,
-  due_date date null,
-  payment_terms character varying(100) null default 'Net 8 days'::character varying,
-  status character varying(50) null default 'draft'::character varying,
-  comments text null,
-  subtotal numeric(12, 2) null default 0,
-  discount_total numeric(12, 2) null default 0,
-  tax_total numeric(12, 2) null default 0,
-  total_amount numeric(12, 2) null default 0,
-  currency character varying(10) null default 'DKK'::character varying,
-  bank_reg_no character varying(50) null,
-  bank_account_no character varying(50) null,
-  interest_rate numeric(5, 2) null default 0.81,
-  late_fee numeric(12, 2) null default 100.00,
-  created_at timestamp without time zone null default now(),
-  updated_at timestamp without time zone null default now(),
-  is_published boolean null default false,
-  payment_link text null,
-  constraint invoices_pkey primary key (id),
-  constraint invoices_contact_id_fkey foreign KEY (contact_id) references contacts (id) on delete set null,
-  constraint invoices_created_by_fkey foreign KEY (created_by) references users (id) on delete set null,
-  constraint invoices_organization_id_fkey foreign KEY (organization_id) references organizations (id) on delete CASCADE
-) TABLESPACE pg_default;
+CREATE TABLE public.invoices (
+  id bigint NOT NULL DEFAULT nextval('invoices_id_seq'::regclass),
+  organization_id bigint NOT NULL,
+  contact_id bigint,
+  created_by bigint,
+  invoice_number integer NOT NULL DEFAULT nextval('invoices_invoice_number_seq'::regclass),
+  issue_date date NOT NULL DEFAULT CURRENT_DATE,
+  due_date date,
+  payment_terms character varying DEFAULT 'Net 8 days'::character varying,
+  status character varying DEFAULT 'draft'::character varying,
+  comments text,
+  subtotal numeric DEFAULT 0,
+  discount_total numeric DEFAULT 0,
+  tax_total numeric DEFAULT 0,
+  total_amount numeric DEFAULT 0,
+  currency character varying DEFAULT 'DKK'::character varying,
+  bank_reg_no character varying,
+  bank_account_no character varying,
+  interest_rate numeric DEFAULT 0.81,
+  late_fee numeric DEFAULT 100.00,
+  created_at timestamp without time zone DEFAULT now(),
+  updated_at timestamp without time zone DEFAULT now(),
+  is_published boolean DEFAULT false,
+  payment_link text,
+  CONSTRAINT invoices_pkey PRIMARY KEY (id),
+  CONSTRAINT invoices_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id),
+  CONSTRAINT invoices_contact_id_fkey FOREIGN KEY (contact_id) REFERENCES public.contacts(id),
+  CONSTRAINT invoices_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
+);
 CREATE TABLE public.organizations (
   id bigint NOT NULL DEFAULT nextval('organizations_id_seq'::regclass),
   created_by bigint NOT NULL,
